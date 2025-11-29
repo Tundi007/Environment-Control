@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Environment Control Admin</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+</head>
+<body class="section">
+<div class="container">
+    <h1 class="title">Device Upload Console</h1>
+    <div class="box">
+        <h2 class="subtitle">Register Device</h2>
+        <form method="post" action="/admin/devices" class="columns is-multiline">
+            <div class="column is-3"><input class="input" name="deviceId" placeholder="Device ID" required></div>
+            <div class="column is-3"><input class="input" name="secret" placeholder="Shared secret" required></div>
+            <div class="column is-4"><input class="input" name="name" placeholder="Friendly name" required></div>
+            <div class="column is-2"><button class="button is-primary" type="submit">Register</button></div>
+        </form>
+        <p class="is-size-7">Use deviceId/secret in the Arduino sketch to obtain a JWT.</p>
+    </div>
+
+    <div class="columns">
+        <div class="column is-5">
+            <div class="box">
+                <h2 class="subtitle">Devices</h2>
+                <table class="table is-fullwidth is-striped">
+                    <thead><tr><th>ID</th><th>Name</th><th>Upload?</th><th>Actions</th></tr></thead>
+                    <tbody>
+                    <tr th:each="device : ${devices}">
+                        <td th:text="${device.deviceId}"></td>
+                        <td th:text="${device.name}"></td>
+                        <td th:text="${device.uploadRequested} ? 'Requested' : 'Idle'"></td>
+                        <td>
+                            <a class="button is-small" th:href="@{'/?selected=' + ${device.deviceId}}">View</a>
+                            <form th:action="@{'/admin/devices/' + ${device.deviceId} + '/request-upload'}" method="post" style="display:inline">
+                                <button class="button is-small is-warning" type="submit">Trigger upload</button>
+                            </form>
+                            <form th:action="@{'/admin/devices/' + ${device.deviceId} + '/clear-upload'}" method="post" style="display:inline">
+                                <button class="button is-small is-light" type="submit">Clear flag</button>
+                            </form>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="column">
+            <div class="box" th:if="${selectedDevice != null}">
+                <h2 class="subtitle" th:text="${'Data for ' + selectedDevice.deviceId}"></h2>
+                <p><strong>Last seen:</strong> <span th:text="${selectedDevice.lastSeen}"></span></p>
+                <p><strong>Last ack:</strong> <span th:text="${selectedDevice.lastSequenceAcknowledged}"></span></p>
+                <table class="table is-fullwidth is-narrow">
+                    <thead><tr><th>Sequence</th><th>Payload</th><th>Timestamp</th></tr></thead>
+                    <tbody>
+                    <tr th:each="row : ${data}">
+                        <td th:text="${row.sequenceNumber}"></td>
+                        <td th:text="${row.payload}"></td>
+                        <td th:text="${row.createdAt}"></td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="box" th:unless="${selectedDevice != null}">
+                <p>Select a device to view stored data and status.</p>
+            </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>
