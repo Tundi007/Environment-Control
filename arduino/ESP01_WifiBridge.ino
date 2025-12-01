@@ -8,6 +8,7 @@
  * the Arduino over Serial and forwards them to a webserver as HTTP POST
  * requests, so the Arduino can publish data without a Wi-Fi shield. There is
  * no Arduino Cloud dependency—just point the ESP-01 at your LAN Wi-Fi.
+ * requests, so the Arduino can publish data without a Wi-Fi shield.
  */
 
 const char* WIFI_SSID = "your-ssid";
