@@ -6,6 +6,8 @@
  * newline-delimited readings that are forwarded to the Arduino over the
  * hardware serial pins. It also reads newline-delimited payloads coming from
  * the Arduino over Serial and forwards them to a webserver as HTTP POST
+ * requests, so the Arduino can publish data without a Wi-Fi shield. There is
+ * no Arduino Cloud dependency—just point the ESP-01 at your LAN Wi-Fi.
  * requests, so the Arduino can publish data without a Wi-Fi shield.
  */
 
@@ -52,6 +54,9 @@ void forwardSensorClients() {
 }
 
 void postArduinoMessage(const String& message) {
+  if (API_HOST == nullptr || API_HOST[0] == '\0') {
+    return; // upstream posting disabled
+  }
   WiFiClient webClient;
   if (!webClient.connect(API_HOST, API_PORT)) {
     return; // drop silently if offline

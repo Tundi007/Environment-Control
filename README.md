@@ -57,3 +57,19 @@ Set the `WIFI_SSID`, `WIFI_PASSWORD`, and `BRIDGE_HOST` constants before
 uploading. The bridge sketch should run on the ESP-01 attached to the Arduino
 hardware serial port; each satellite sketch runs on its own ESP-01 module that
 connects to the bridge over Wi-Fi.
+
+### How the ESP-01 pair talk (no Arduino Cloud required)
+
+- The bridge ESP-01 joins your existing Wi-Fi with the credentials in
+  `ESP01_WifiBridge.ino`; there is no Arduino Cloud dependency.
+- Wire the bridge RX/TX to your Arduino (e.g., Nano) hardware serial pins with
+  proper 3.3V level shifting, and cross RX->TX / TX->RX so the bridge can
+  forward data in both directions.
+- Each sensor ESP-01 runs its client sketch, joins the same Wi-Fi, opens a TCP
+  connection to the bridge at port `4210`, and sends newline-delimited payloads
+  (e.g., `DHT11:23.1:44.0`). The bridge prints those lines to the Arduino over
+  Serial so your sketch can parse them directly.
+- When your Arduino sketch prints a newline-delimited message to Serial, the
+  bridge posts it to the configured webserver in `ESP01_WifiBridge.ino`. If you
+  do not need upstream posting, you can leave `API_HOST` blank or ignore the
+  helper and simply read bridge Serial output on the host PC.
