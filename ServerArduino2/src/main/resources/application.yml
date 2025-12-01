@@ -1,0 +1,32 @@
+server:
+  port: 8080
+
+management:
+  server:
+    port: 8080
+  endpoints:
+    web:
+      exposure:
+        include: shutdown
+  endpoint:
+    shutdown:
+      enabled: true
+
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/climate_db
+    driverClassName: org.postgresql.Driver
+    username: postgres
+    password: 123
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        format_sql: true
+    defer-datasource-initialization: true
+
+app:
+  security:
+    # Must be at least 32 bytes for HS256; override via env var in production.
+    jwt-secret: change-this-key-to-a-very-long-random-string-123456

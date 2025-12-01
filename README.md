@@ -9,7 +9,7 @@ cd environment-control
 ./mvnw spring-boot:run # or mvn spring-boot:run if mvnw unavailable
 ```
 
-An in-memory H2 database is used by default. Change `spring.datasource.url` in `src/main/resources/application.yml` to point at PostgreSQL when deploying.
+PostgreSQL is used by default. Update `spring.datasource.url`, `spring.datasource.username`, and `spring.datasource.password` in `src/main/resources/application.yml` (or supply them via environment variables) to point at your database instance.
 
 ## Device APIs
 
@@ -24,8 +24,6 @@ Open `http://localhost:8080/` for the minimal console to:
 - Register devices with a device ID, secret, and name.
 - Trigger or clear the upload flag per device.
 - Inspect stored data and the last acknowledged sequence.
-
-The H2 console is available at `/h2-console` while running locally.
 
 ## Arduino client sketch
 
