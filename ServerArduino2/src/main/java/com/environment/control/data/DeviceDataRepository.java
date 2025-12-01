@@ -6,4 +6,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface DeviceDataRepository extends JpaRepository<DeviceData, Long> {
     List<DeviceData> findByDeviceOrderBySequenceNumberAsc(Device device);
+
+    void deleteByDevice(Device device);
 }

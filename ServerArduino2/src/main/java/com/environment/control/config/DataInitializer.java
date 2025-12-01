@@ -12,7 +12,7 @@ public class DataInitializer {
     CommandLineRunner seedDevices(DeviceService deviceService) {
         return args -> {
             if (deviceService.listDevices().isEmpty()) {
-                deviceService.register("demo-device", "demo-secret", "Demo greenhouse controller");
+                deviceService.register("demo-device", "demo-secret", "Demo greenhouse controller", "");
             }
         };
     }

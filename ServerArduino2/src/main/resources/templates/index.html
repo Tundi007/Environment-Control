@@ -13,8 +13,9 @@
         <form method="post" action="/admin/devices" class="columns is-multiline">
             <div class="column is-3"><input class="input" name="deviceId" placeholder="Device ID" required></div>
             <div class="column is-3"><input class="input" name="secret" placeholder="Shared secret" required></div>
-            <div class="column is-4"><input class="input" name="name" placeholder="Friendly name" required></div>
-            <div class="column is-2"><button class="button is-primary" type="submit">Register</button></div>
+            <div class="column is-3"><input class="input" name="name" placeholder="Friendly name" required></div>
+            <div class="column is-3"><input class="input" name="endpointUrl" placeholder="http://device-host/data" title="Endpoint to poll data directly from the device"></div>
+            <div class="column is-12"><button class="button is-primary" type="submit">Register</button></div>
         </form>
         <p class="is-size-7">Use deviceId/secret in the Arduino sketch to obtain a JWT.</p>
     </div>
@@ -24,11 +25,16 @@
             <div class="box">
                 <h2 class="subtitle">Devices</h2>
                 <table class="table is-fullwidth is-striped">
-                    <thead><tr><th>ID</th><th>Name</th><th>Upload?</th><th>Actions</th></tr></thead>
+                    <thead><tr><th>ID</th><th>Name</th><th>Status</th><th>Upload?</th><th>Actions</th></tr></thead>
                     <tbody>
                     <tr th:each="device : ${devices}">
                         <td th:text="${device.deviceId}"></td>
                         <td th:text="${device.name}"></td>
+                        <td>
+                            <span class="tag" th:classappend="${device.lastSeen != null && device.lastSeen.isAfter(T(java.time.Instant).now().minusSeconds(120))} ? ' is-success' : ' is-light'"
+                                  th:text="${device.lastSeen != null && device.lastSeen.isAfter(T(java.time.Instant).now().minusSeconds(120))} ? 'Online' : 'Offline'"></span>
+                            <p class="is-size-7" th:if="${device.lastSeen != null}" th:text="${'Seen: ' + device.lastSeen}"></p>
+                        </td>
                         <td th:text="${device.uploadRequested} ? 'Requested' : 'Idle'"></td>
                         <td>
                             <a class="button is-small" th:href="@{'/?selected=' + ${device.deviceId}}">View</a>
@@ -37,6 +43,12 @@
                             </form>
                             <form th:action="@{'/admin/devices/' + ${device.deviceId} + '/clear-upload'}" method="post" style="display:inline">
                                 <button class="button is-small is-light" type="submit">Clear flag</button>
+                            </form>
+                            <form th:action="@{'/admin/devices/' + ${device.deviceId} + '/refresh'}" method="post" style="display:inline">
+                                <button class="button is-small is-info" type="submit">Refresh</button>
+                            </form>
+                            <form th:action="@{'/admin/devices/' + ${device.deviceId} + '/delete'}" method="post" style="display:inline">
+                                <button class="button is-small is-danger" type="submit">Delete</button>
                             </form>
                         </td>
                     </tr>
@@ -48,7 +60,9 @@
             <div class="box" th:if="${selectedDevice != null}">
                 <h2 class="subtitle" th:text="${'Data for ' + selectedDevice.deviceId}"></h2>
                 <p><strong>Last seen:</strong> <span th:text="${selectedDevice.lastSeen}"></span></p>
+                <p><strong>Endpoint:</strong> <span th:text="${selectedDevice.endpointUrl}"></span></p>
                 <p><strong>Last ack:</strong> <span th:text="${selectedDevice.lastSequenceAcknowledged}"></span></p>
+                <p><strong>Stored records:</strong> <span th:text="${#lists.size(data)}"></span></p>
                 <table class="table is-fullwidth is-narrow">
                     <thead><tr><th>Sequence</th><th>Payload</th><th>Timestamp</th></tr></thead>
                     <tbody>

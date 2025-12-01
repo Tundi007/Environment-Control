@@ -24,6 +24,8 @@ public class Device {
     @Column(nullable = false)
     private String secret;
 
+    private String endpointUrl;
+
     @Column(nullable = false)
     private boolean uploadRequested = false;
 
@@ -57,6 +59,14 @@ public class Device {
 
     public void setSecret(String secret) {
         this.secret = secret;
+    }
+
+    public String getEndpointUrl() {
+        return endpointUrl;
+    }
+
+    public void setEndpointUrl(String endpointUrl) {
+        this.endpointUrl = endpointUrl;
     }
 
     public boolean isUploadRequested() {
