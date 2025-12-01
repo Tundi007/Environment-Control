@@ -3,6 +3,7 @@ package com.environment.control.device;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import com.environment.control.data.DeviceDataRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -10,9 +11,11 @@ import org.springframework.transaction.annotation.Transactional;
 public class DeviceService {
 
     private final DeviceRepository deviceRepository;
+    private final DeviceDataRepository deviceDataRepository;
 
-    public DeviceService(DeviceRepository deviceRepository) {
+    public DeviceService(DeviceRepository deviceRepository, DeviceDataRepository deviceDataRepository) {
         this.deviceRepository = deviceRepository;
+        this.deviceDataRepository = deviceDataRepository;
     }
 
     public Optional<Device> findByDeviceId(String deviceId) {
@@ -23,11 +26,12 @@ public class DeviceService {
         return deviceRepository.findAll();
     }
 
-    public Device register(String deviceId, String secret, String name) {
+    public Device register(String deviceId, String secret, String name, String endpointUrl) {
         Device device = new Device();
         device.setDeviceId(deviceId);
         device.setSecret(secret);
         device.setName(name);
+        device.setEndpointUrl(endpointUrl);
         return deviceRepository.save(device);
     }
 
@@ -47,5 +51,11 @@ public class DeviceService {
     public void clearRequest(Device device) {
         device.setUploadRequested(false);
         deviceRepository.save(device);
+    }
+
+    @Transactional
+    public void delete(Device device) {
+        deviceDataRepository.deleteByDevice(device);
+        deviceRepository.delete(device);
     }
 }

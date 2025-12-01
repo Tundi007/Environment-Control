@@ -2,6 +2,7 @@ package com.environment.control.web;
 
 import com.environment.control.data.DataIngestionService;
 import com.environment.control.device.Device;
+import com.environment.control.device.DeviceCommunicationService;
 import com.environment.control.device.DeviceService;
 import java.util.List;
 import org.springframework.stereotype.Controller;
@@ -16,11 +17,14 @@ public class AdminController {
 
     private final DeviceService deviceService;
     private final DataIngestionService dataIngestionService;
+    private final DeviceCommunicationService deviceCommunicationService;
 
     public AdminController(DeviceService deviceService,
-                           DataIngestionService dataIngestionService) {
+                           DataIngestionService dataIngestionService,
+                           DeviceCommunicationService deviceCommunicationService) {
         this.deviceService = deviceService;
         this.dataIngestionService = dataIngestionService;
+        this.deviceCommunicationService = deviceCommunicationService;
     }
 
     @GetMapping({"/", "/admin"})
@@ -37,8 +41,11 @@ public class AdminController {
     }
 
     @PostMapping("/admin/devices")
-    public String register(@RequestParam String deviceId, @RequestParam String secret, @RequestParam String name) {
-        deviceService.register(deviceId, secret, name);
+    public String register(@RequestParam String deviceId,
+                           @RequestParam String secret,
+                           @RequestParam String name,
+                           @RequestParam(required = false, defaultValue = "") String endpointUrl) {
+        deviceService.register(deviceId, secret, name, endpointUrl);
         return "redirect:/?selected=" + deviceId;
     }
 
@@ -52,5 +59,17 @@ public class AdminController {
     public String clearUpload(@PathVariable String deviceId) {
         deviceService.findByDeviceId(deviceId).ifPresent(deviceService::clearRequest);
         return "redirect:/?selected=" + deviceId;
+    }
+
+    @PostMapping("/admin/devices/{deviceId}/refresh")
+    public String refresh(@PathVariable String deviceId) {
+        deviceService.findByDeviceId(deviceId).ifPresent(deviceCommunicationService::pullFromDevice);
+        return "redirect:/?selected=" + deviceId;
+    }
+
+    @PostMapping("/admin/devices/{deviceId}/delete")
+    public String delete(@PathVariable String deviceId) {
+        deviceService.findByDeviceId(deviceId).ifPresent(deviceService::delete);
+        return "redirect:/";
     }
 }
