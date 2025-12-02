@@ -29,11 +29,14 @@ Open `http://localhost:8080/` for the minimal console to:
 
 See [`arduino/DeviceClient.ino`](environment-control/arduino/DeviceClient.ino) for a reference implementation that:
 
-- Connects over HTTPS, logs in with device ID/secret, and caches the returned JWT.
-- Stores sensor readings with sequence numbers in EEPROM as a ring buffer.
-- Long-polls for upload requests, posts readings in batches with retry/backoff, and advances the send pointer using the server acknowledgment.
+- Streams newline-delimited JSON over hardware Serial to the ESP-01 Wi-Fi bridge,
+  keeping the main Arduino sketch Wi-Fi-free.
+- Includes a sequence number and payload string (`"temp,humidity"`) with each message
+  so the upstream service can keep ordering.
 
-Replace Wi-Fi credentials, TLS root certificate, and API host/port before uploading to hardware.
+Wire the ESP-01 bridge RX/TX to the Arduino hardware serial pins (with proper level
+shifting) and configure Wi-Fi credentials in
+[`arduino/ESP01_WifiBridge.ino`](environment-control/arduino/ESP01_WifiBridge.ino).
 
 ## ESP-01 bridge and satellite sketches
 
