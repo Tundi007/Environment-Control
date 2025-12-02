@@ -29,11 +29,10 @@ Open `http://localhost:8080/` for the minimal console to:
 
 See [`arduino/DeviceClient.ino`](environment-control/arduino/DeviceClient.ino) for a reference implementation that:
 
-- Listens for newline-delimited sensor payloads arriving from the ESP-01 bridge
-  (e.g., `DHT11:23.1:44.0`), stores the most recent readings in RAM, and
-  mirrors them back to the bridge as JSON for upstream posting.
-- Keeps the main Arduino sketch Wi-Fi-free while still tracking a
-  `sequenceNumber` and the originating sensor type for each reading.
+- Streams newline-delimited JSON over hardware Serial to the ESP-01 Wi-Fi bridge,
+  keeping the main Arduino sketch Wi-Fi-free.
+- Includes a sequence number and payload string (`"temp,humidity"`) with each message
+  so the upstream service can keep ordering.
 
 Wire the ESP-01 bridge RX/TX to the Arduino hardware serial pins (with proper level
 shifting) and configure Wi-Fi credentials in
