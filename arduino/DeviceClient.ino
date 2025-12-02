@@ -1,141 +1,87 @@
 /**
- * Example Arduino sketch for posting buffered sensor readings to the
- * Environment Control Spring Boot backend.
+ * Arduino sketch for boards without Wi-Fi. It consumes sensor readings that
+ * arrive over the attached ESP-01 Wi-Fi bridge (see ESP01_WifiBridge.ino),
+ * stores them locally in RAM, and mirrors each reading back to the bridge as
+ * JSON so it can be posted upstream.
  */
 #include <Arduino.h>
-#include <WiFiClientSecure.h>
-#include <ArduinoJson.h>
-#include <EEPROM.h>
-
-const char* WIFI_SSID = "your-ssid";
-const char* WIFI_PASSWORD = "your-password";
-const char* DEVICE_ID = "demo-device";
-const char* DEVICE_SECRET = "demo-secret";
-const char* API_HOST = "your.api.host";
-const uint16_t API_PORT = 8443; // HTTPS port
-const char* ROOT_CA = "-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----\n";
 
 struct Reading {
-  uint32_t sequence;
+  String source;
   float temperature;
   float humidity;
+  uint32_t sequenceNumber;
+  unsigned long receivedAtMs;
 };
 
-const size_t MAX_RECORDS = 64; // EEPROM-backed ring buffer
-uint32_t writeIndex = 0;
-uint32_t sendIndex = 0;
-String jwtToken;
-WiFiClientSecure client;
+// Metadata to include with each payload
+const char* DEVICE_ID = "demo-device";
+const size_t MAX_STORED_READINGS = 16;
 
-void saveReading(float temperature, float humidity) {
-  Reading reading{writeIndex, temperature, humidity};
-  int addr = (writeIndex % MAX_RECORDS) * sizeof(Reading);
-  EEPROM.put(addr, reading);
-  EEPROM.commit();
-  writeIndex++;
+Reading readings[MAX_STORED_READINGS];
+size_t readingCount = 0;
+size_t nextInsertIndex = 0;
+uint32_t nextSequenceNumber = 0;
+
+void sendReadingToBridge(const Reading& reading) {
+  String payload = String("{\"deviceId\":\"") + DEVICE_ID + "\",";
+  payload += String("\"sequenceNumber\":") + reading.sequenceNumber + ",";
+  payload += String("\"source\":\"") + reading.source + "\",";
+  payload += String("\"temperature\":") + reading.temperature + ",";
+  payload += String("\"humidity\":") + reading.humidity + "\"}";
+
+  Serial.println(payload); // bridge listens for newline-delimited messages
 }
 
-bool connectWifi() {
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-  uint8_t retries = 0;
-  while (WiFi.status() != WL_CONNECTED && retries++ < 20) {
-    delay(500);
+void storeReading(const String& source, float temperature, float humidity) {
+  Reading reading;
+  reading.source = source;
+  reading.temperature = temperature;
+  reading.humidity = humidity;
+  reading.sequenceNumber = nextSequenceNumber++;
+  reading.receivedAtMs = millis();
+
+  readings[nextInsertIndex] = reading;
+  if (readingCount < MAX_STORED_READINGS) {
+    readingCount++;
   }
-  return WiFi.status() == WL_CONNECTED;
+  nextInsertIndex = (nextInsertIndex + 1) % MAX_STORED_READINGS;
+
+  sendReadingToBridge(reading);
 }
 
-bool login() {
-  if (!client.connect(API_HOST, API_PORT)) return false;
-  client.setCACert(ROOT_CA);
-  DynamicJsonDocument doc(256);
-  doc["deviceId"] = DEVICE_ID;
-  doc["secret"] = DEVICE_SECRET;
-  String body;
-  serializeJson(doc, body);
+bool parseSensorLine(const String& line, String& source, float& temperature, float& humidity) {
+  int firstColon = line.indexOf(':');
+  int secondColon = line.indexOf(':', firstColon + 1);
+  if (firstColon == -1 || secondColon == -1) {
+    return false;
+  }
 
-  client.println(String("POST /api/devices/login HTTP/1.1"));
-  client.println(String("Host: ") + API_HOST);
-  client.println("Content-Type: application/json");
-  client.println(String("Content-Length: ") + body.length());
-  client.println();
-  client.print(body);
-
-  // Basic response parse
-  while (client.connected() && !client.available()) delay(10);
-  String response = client.readString();
-  int tokenIndex = response.indexOf("\"token\":\"");
-  if (tokenIndex < 0) return false;
-  int start = tokenIndex + 10;
-  int end = response.indexOf('\"', start);
-  jwtToken = response.substring(start, end);
+  source = line.substring(0, firstColon);
+  temperature = line.substring(firstColon + 1, secondColon).toFloat();
+  humidity = line.substring(secondColon + 1).toFloat();
   return true;
 }
 
-bool pollForUpload() {
-  if (jwtToken.isEmpty()) return false;
-  if (!client.connect(API_HOST, API_PORT)) return false;
-  client.setCACert(ROOT_CA);
-  client.println("GET /api/devices/pending-requests?longPoll=true HTTP/1.1");
-  client.println(String("Host: ") + API_HOST);
-  client.println(String("Authorization: Bearer ") + jwtToken);
-  client.println();
-  while (client.connected() && !client.available()) delay(10);
-  String body = client.readString();
-  return body.indexOf("uploadRequested":true) > 0;
-}
+void handleIncomingSerial() {
+  if (!Serial.available()) return;
 
-bool sendBatch() {
-  if (jwtToken.isEmpty()) return false;
-  if (!client.connect(API_HOST, API_PORT)) return false;
-  client.setCACert(ROOT_CA);
-  DynamicJsonDocument doc(2048);
-  JsonArray arr = doc.createNestedArray("records");
-  uint32_t cursor = sendIndex;
-  for (; cursor < writeIndex && arr.size() < 10; cursor++) {
-    Reading r; EEPROM.get((cursor % MAX_RECORDS) * sizeof(Reading), r);
-    JsonObject rec = arr.createNestedObject();
-    rec["sequenceNumber"] = r.sequence;
-    rec["payload"] = String(r.temperature) + "," + String(r.humidity);
+  String line = Serial.readStringUntil('\n');
+  line.trim();
+  if (line.length() == 0) return;
+
+  String source;
+  float temperature = 0.0;
+  float humidity = 0.0;
+  if (parseSensorLine(line, source, temperature, humidity)) {
+    storeReading(source, temperature, humidity);
   }
-  String body; serializeJson(doc, body);
-  client.println("POST /api/devices/data HTTP/1.1");
-  client.println(String("Host: ") + API_HOST);
-  client.println("Content-Type: application/json");
-  client.println(String("Authorization: Bearer ") + jwtToken);
-  client.println(String("Content-Length: ") + body.length());
-  client.println();
-  client.print(body);
-  while (client.connected() && !client.available()) delay(10);
-  String response = client.readString();
-  int idx = response.indexOf("lastProcessedSequence");
-  if (idx < 0) return false;
-  uint32_t acked = response.substring(idx + 23).toInt();
-  // Drop acknowledged records
-  if (acked >= sendIndex) {
-    sendIndex = acked + 1;
-  }
-  return true;
 }
 
 void setup() {
-  Serial.begin(115200);
-  EEPROM.begin(MAX_RECORDS * sizeof(Reading));
-  connectWifi();
-  login();
+  Serial.begin(115200); // Connected to ESP-01 bridge RX/TX (with level shifting)
 }
 
 void loop() {
-  // Replace with your own sensor sampling
-  saveReading(random(200, 300) / 10.0, random(300, 500) / 10.0);
-
-  if (pollForUpload()) {
-    uint8_t attempts = 0;
-    while (sendIndex < writeIndex && attempts++ < 5) {
-      if (!sendBatch()) {
-        delay(2000 * attempts); // backoff
-      }
-    }
-  }
-
-  delay(10000);
+  handleIncomingSerial();
 }
