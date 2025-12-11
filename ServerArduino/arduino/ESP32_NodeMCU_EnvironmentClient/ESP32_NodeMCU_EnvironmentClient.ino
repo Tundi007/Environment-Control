@@ -104,6 +104,7 @@ void loadIndexes() {
 
 bool ensureWifi() {
   if (WiFi.status() == WL_CONNECTED) {
+    Serial.println("wifi connected");
     return true;
   }
   if (USE_S_IP) {
@@ -167,6 +168,7 @@ bool ensureAuthenticated() {
 }
 
 bool pollForUpload() {
+  login();
   if (!ONLY_UPLOAD_WHEN_REQUESTED) return true;
   if (!ensureAuthenticated()) return false;
   HTTPClient http;
@@ -176,8 +178,7 @@ bool pollForUpload() {
   int code = http.GET();
   if (code != HTTP_CODE_OK) {
     http.end();
-    Serial.println("Payload transmition failed");    
-    login();
+    Serial.println("Not Requested");    
     return false;
   }
   String body = http.getString();
@@ -186,6 +187,7 @@ bool pollForUpload() {
   int flagIndex = body.indexOf("uploadRequested");
   if (flagIndex < 0) return false;
   int trueIndex = body.indexOf("true", flagIndex);
+    Serial.println("Upload Requested");    
   return trueIndex > flagIndex;
 }
 
@@ -245,7 +247,8 @@ bool sendBatch() {
   if (acked >= sendIndex && acked < writeIndex) {
     sendIndex = acked + 1;
     persistIndexes();
-  }
+  }  
+  Serial.printf("Upload complete: %d\n", code);
   return true;
 }
 
@@ -369,7 +372,7 @@ void loop() {
         lastUploadMs = now;
       }
     }else {
-      Serial.println("Couldn't authenticate");
+      Serial.println("not authenticate");
     }
   }else {    
     Serial.println("offline");
