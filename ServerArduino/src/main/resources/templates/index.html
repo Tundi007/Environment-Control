@@ -38,14 +38,12 @@
                         <td th:text="${device.uploadRequested} ? 'Requested' : 'Idle'"></td>
                         <td>
                             <a class="button is-small" th:href="@{'/?selected=' + ${device.deviceId}}">View</a>
+                            <a class="button is-small is-info" th:href="@{'/admin/devices/' + ${device.deviceId} + '/charts'}">Charts</a>
                             <form th:action="@{'/admin/devices/' + ${device.deviceId} + '/request-upload'}" method="post" style="display:inline">
                                 <button class="button is-small is-warning" type="submit">Trigger upload</button>
                             </form>
                             <form th:action="@{'/admin/devices/' + ${device.deviceId} + '/clear-upload'}" method="post" style="display:inline">
                                 <button class="button is-small is-light" type="submit">Clear flag</button>
-                            </form>
-                            <form th:action="@{'/admin/devices/' + ${device.deviceId} + '/refresh'}" method="post" style="display:inline">
-                                <button class="button is-small is-info" type="submit">Refresh</button>
                             </form>
                             <form th:action="@{'/admin/devices/' + ${device.deviceId} + '/delete'}" method="post" style="display:inline">
                                 <button class="button is-small is-danger" type="submit">Delete</button>
