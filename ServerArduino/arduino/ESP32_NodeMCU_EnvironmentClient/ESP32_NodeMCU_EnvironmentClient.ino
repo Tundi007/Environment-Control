@@ -168,7 +168,6 @@ bool ensureAuthenticated() {
 }
 
 bool pollForUpload() {
-  login();
   if (!ONLY_UPLOAD_WHEN_REQUESTED) return true;
   if (!ensureAuthenticated()) return false;
   HTTPClient http;
@@ -377,7 +376,6 @@ void loop() {
   }else {    
     Serial.println("offline");
   }
-
   server.handleClient();
-  delay(1000);
+  delay(100);
 }
