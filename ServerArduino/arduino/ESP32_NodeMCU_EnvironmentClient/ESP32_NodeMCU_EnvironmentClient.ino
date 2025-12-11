@@ -46,9 +46,10 @@ const int HYSRF_TRIG_PIN = 5;   // HY-SRF05 trigger pin
 const int HYSRF_ECHO_PIN = 18;  // HY-SRF05 echo pin
 
 // Timing configuration.
-const uint32_t SAMPLE_INTERVAL_MS = 6000000;  // Add a reading every 10m
-const uint32_t SAMPLE_INTERVAL_MS_DEMO = 10000;  // Add a reading every 10s
-const uint32_t UPLOAD_INTERVAL_MS = 600000; // Try to upload every 10 minutes
+const uint32_t SAMPLE_INTERVAL_MS_DEMO = 1000;  // Add a reading every 1s
+const uint32_t UPLOAD_INTERVAL_MS_DEMO = 5000; // Try to upload every 5s
+const uint32_t SAMPLE_INTERVAL_MS = 600000;  // Add a reading every 10m
+const uint32_t UPLOAD_INTERVAL_MS = 3600000; // Try to upload every 1h
 const bool ONLY_UPLOAD_WHEN_REQUESTED = true; // true = honor /pending-requests flag
 const size_t BATCH_SIZE = 100000000;               // Max records per POST
 const bool ENABLE_HTTP_DATA_ENDPOINT = true; // expose GET /data for admin "Refresh"
@@ -361,9 +362,9 @@ void loop() {
     lastSampleMs = now;
   }
 
-  if (sendIndex < writeIndex && (pollForUpload() || (now - lastUploadMs >= UPLOAD_INTERVAL_MS))) {
-    sendBatch();
-    lastUploadMs = now;
+  if (sendIndex < writeIndex && (pollForUpload() || (now - lastUploadMs >= UPLOAD_INTERVAL_MS_DEMO))) {
+    if(sendBatch())
+      lastUploadMs = now;
   }
   
   server.handleClient();
