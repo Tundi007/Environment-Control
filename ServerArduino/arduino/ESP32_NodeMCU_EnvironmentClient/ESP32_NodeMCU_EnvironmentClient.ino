@@ -46,10 +46,11 @@ const int HYSRF_TRIG_PIN = 5;   // HY-SRF05 trigger pin
 const int HYSRF_ECHO_PIN = 18;  // HY-SRF05 echo pin
 
 // Timing configuration.
-const uint32_t SAMPLE_INTERVAL_MS = 10000;  // Add a reading every 10s
-const uint32_t UPLOAD_INTERVAL_MS = 2000;   // Try to upload every 2s
+const uint32_t SAMPLE_INTERVAL_MS = 6000000;  // Add a reading every 10m
+const uint32_t SAMPLE_INTERVAL_MS_DEMO = 10000;  // Add a reading every 10s
+const uint32_t UPLOAD_INTERVAL_MS = 600000; // Try to upload every 10 minutes
 const bool ONLY_UPLOAD_WHEN_REQUESTED = true; // true = honor /pending-requests flag
-const size_t BATCH_SIZE = 10;               // Max records per POST
+const size_t BATCH_SIZE = 100000000;               // Max records per POST
 const bool ENABLE_HTTP_DATA_ENDPOINT = true; // expose GET /data for admin "Refresh"
 const uint16_t DATA_HTTP_PORT = 80;
 
@@ -186,7 +187,7 @@ bool pollForUpload() {
   int flagIndex = body.indexOf("uploadRequested");
   if (flagIndex < 0) return false;
   int trueIndex = body.indexOf("true", flagIndex);
-    Serial.println("Upload Requested");    
+  Serial.println("Upload Requested");
   return trueIndex > flagIndex;
 }
 
@@ -355,27 +356,16 @@ void loop() {
   
   const unsigned long now = millis();
 
-  if (now - lastSampleMs >= SAMPLE_INTERVAL_MS) {
+  if (now - lastSampleMs >= SAMPLE_INTERVAL_MS_DEMO) {
     sampleAndStore();
     lastSampleMs = now;
   }
 
-  if(ensureWifi()){
-    Serial.println("online");
-    if(ensureAuthenticated()){
-      Serial.println("authenticated");
-      if (sendIndex < writeIndex && now - lastUploadMs >= UPLOAD_INTERVAL_MS) {
-        if (pollForUpload()) {
-          sendBatch();
-        }
-        lastUploadMs = now;
-      }
-    }else {
-      Serial.println("not authenticate");
-    }
-  }else {    
-    Serial.println("offline");
+  if (sendIndex < writeIndex && (pollForUpload() || (now - lastUploadMs >= UPLOAD_INTERVAL_MS))) {
+    sendBatch();
+    lastUploadMs = now;
   }
+  
   server.handleClient();
-  delay(100);
+  delay(50);
 }
