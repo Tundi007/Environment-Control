@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title th:text="${'Device Charts - ' + device.name}">Device Charts</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+</head>
+<body class="section">
+<div class="container">
+    <div class="level">
+        <div class="level-left">
+            <div>
+                <p class="heading">Device</p>
+                <p class="title is-4" th:text="${device.name}"></p>
+                <p class="subtitle is-6" th:text="${device.deviceId}"></p>
+            </div>
+        </div>
+        <div class="level-right">
+            <a class="button is-light" href="/">Back to dashboard</a>
+        </div>
+    </div>
+
+    <div class="notification is-info is-light" th:if="${#strings.isEmpty(chartDataJson)}">No chart data available.</div>
+
+    <div th:if="${!#strings.isEmpty(chartDataJson)}" class="columns is-multiline">
+        <div class="column is-12">
+            <div class="box">
+                <h2 class="subtitle">MQ135</h2>
+                <canvas id="mq135Chart" aria-label="MQ135 readings over time"></canvas>
+            </div>
+        </div>
+        <div class="column is-12">
+            <div class="box">
+                <h2 class="subtitle">Humidity</h2>
+                <canvas id="humidityChart" aria-label="Humidity readings over time"></canvas>
+            </div>
+        </div>
+        <div class="column is-12">
+            <div class="box">
+                <h2 class="subtitle">Temperature</h2>
+                <canvas id="temperatureChart" aria-label="Temperature readings over time"></canvas>
+            </div>
+        </div>
+        <div class="column is-12">
+            <div class="box">
+                <h2 class="subtitle">Distance</h2>
+                <canvas id="distanceChart" aria-label="Distance readings over time"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script th:inline="javascript">
+    const chartData = /*[[${chartDataJson}]]*/ '[]';
+
+    function buildDataset(points, key, label, color) {
+        const filtered = points
+            .filter(point => point[key] !== null)
+            .map(point => ({x: new Date(point.timestamp), y: point[key]}));
+        return {
+            label: label,
+            data: filtered,
+            borderColor: color,
+            backgroundColor: color,
+            tension: 0.2,
+            fill: false
+        };
+    }
+
+    function renderChart(canvasId, dataset, yLabel) {
+        if (!dataset.data.length) {
+            document.getElementById(canvasId).parentElement.insertAdjacentHTML('beforeend', '<p class="has-text-grey">No data available.</p>');
+            return;
+        }
+        new Chart(document.getElementById(canvasId), {
+            type: 'line',
+            data: { datasets: [dataset] },
+            options: {
+                responsive: true,
+                parsing: false,
+                scales: {
+                    x: {
+                        type: 'time',
+                        time: {
+                            tooltipFormat: 'yyyy-MM-dd HH:mm',
+                            displayFormats: {
+                                minute: 'yyyy-MM-dd HH:mm',
+                                hour: 'yyyy-MM-dd HH:mm',
+                                day: 'yyyy-MM-dd'
+                            }
+                        },
+                        title: { display: true, text: 'Timestamp' }
+                    },
+                    y: {
+                        title: { display: true, text: yLabel },
+                        beginAtZero: false
+                    }
+                }
+            }
+        });
+    }
+
+    renderChart('mq135Chart', buildDataset(chartData, 'mq135', 'MQ135', '#209cee'), 'MQ135');
+    renderChart('humidityChart', buildDataset(chartData, 'humidity', 'Humidity (%)', '#23d160'), 'Humidity (%)');
+    renderChart('temperatureChart', buildDataset(chartData, 'temperature', 'Temperature (°C)', '#ff3860'), 'Temperature (°C)');
+    renderChart('distanceChart', buildDataset(chartData, 'distance', 'Distance', '#ffdd57'), 'Distance');
+</script>
+</body>
+</html>
