@@ -49,17 +49,34 @@ Arduino client:
   hardware UART. It also reads newline-delimited messages arriving from the
   Arduino over Serial and POSTs them to a configurable webserver so the
   Arduino can publish data without its own Wi-Fi shield.
-- `ESP01_MQ135_Client.ino` — samples the MQ135 gas sensor on pin `A0` and sends
+- `ESP01_MQ135_Client.ino` - samples the MQ135 gas sensor on pin `A0` and sends
   `MQ135:<value>` lines to the bridge.
-- `ESP01_DHT11_Client.ino` — reads a DHT11 on GPIO2 and sends
+- `ESP01_DHT11_Client.ino` - reads a DHT11 on GPIO2 and sends
   `DHT11:<temperatureC>:<humidity>` payloads.
-- `ESP01_HYSRF05_Client.ino` — drives an HY-SRF05 ultrasonic sensor on GPIO0
+- `ESP01_HYSRF05_Client.ino` - drives an HY-SRF05 ultrasonic sensor on GPIO0
   (TRIG) and GPIO2 (ECHO), sending `HYSRF05:<distance_cm>` to the bridge.
 
 Set the `WIFI_SSID`, `WIFI_PASSWORD`, and `BRIDGE_HOST` constants before
 uploading. The bridge sketch should run on the ESP-01 attached to the Arduino
 hardware serial port; each satellite sketch runs on its own ESP-01 module that
 connects to the bridge over Wi-Fi.
+
+## ESP32 NodeMCU sensor client
+
+If you prefer a single ESP32 NodeMCU (with built-in Wi-Fi) that talks directly
+to the backend, use [`arduino/ESP32_NodeMCU_EnvironmentClient.ino`](environment-control/arduino/ESP32_NodeMCU_EnvironmentClient.ino).
+
+- Samples MQ135 (analog), DHT11 (temperature/humidity), and HY-SRF05
+  (ultrasonic distance) and buffers readings in EEPROM with a sequence number.
+- Posts batches to `/api/devices/data` using the same structure the backend
+  expects: `{ "records": [{ "sequenceNumber": 1, "payload": "mq135=1.23,tempC=23.4,humidity=44.0,distanceCm=123.0" }, ...] }`.
+- Defaults: MQ135 on ADC34, DHT11 on GPIO4, HY-SRF05 TRIG on GPIO5 and ECHO on
+  GPIO18. Update these constants to match your wiring.
+- Set `WIFI_SSID`, `WIFI_PASSWORD`, `DEVICE_ID`, `DEVICE_SECRET`, `API_HOST`,
+  and `API_PORT` (plus `ROOT_CA` if you use HTTPS) near the top of the sketch.
+- Flip `ONLY_UPLOAD_WHEN_REQUESTED` to `true` if you want uploads to happen only
+  when the admin console triggers `/api/devices/pending-requests`; otherwise the
+  ESP32 will push buffered records on a schedule.
 
 ### How the ESP-01 pair talk (no Arduino Cloud required)
 
