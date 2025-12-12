@@ -1,29 +1,29 @@
 /**
  * ESP32 NodeMCU client for the Environment Control backend.
  *
- * - Samples MQ135 (analog), DHT11 (temp/humidity), and HY-SRF05 (ultrasonic).
+ * - Samples MQ135 (gas), DHT11 (temp/humidity), and HY-SRF05 (ultrasonic).
  * - Buffers readings with sequence numbers in EEPROM (ring buffer).
- * - Posts batches to /api/devices/data using the server's DeviceDataRecord
- *   structure: [{ "sequenceNumber": n, "payload": "<string>" }].
+ * - Posts batches to /api/devices/data using DeviceDataRecord payload strings.
  * - Uses /api/devices/login to obtain a JWT and includes it in uploads.
  *
  * Required libraries (Arduino IDE Library Manager):
  *   - ArduinoJson
  *   - DHT sensor library (by Adafruit)
+ *   - MQUnifiedsensor
  */
 #include <Arduino.h>
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
 #include <EEPROM.h>
-#include <WebServer.h>
 #include <DHT.h>
+#include <WebServer.h>
 #include <NewPing.h>
 #include <MQUnifiedsensor.h>
 
 // ---- Hardware configuration ----
 const uint8_t MQ135_PIN = 34;           // ADC pin for MQ135 sensor
-const char* MQ135_BOARD = "ESP-32";    // Board identifier for MQUnifiedsensor
+const char* MQ135_BOARD = "ESP-32";     // Board identifier for MQUnifiedsensor
 const float MQ135_VOLTAGE = 3.3;        // ESP32 ADC reference voltage
 const uint16_t MQ135_ADC_RESOLUTION = 12;
 const float MQ135_CLEAN_AIR_RATIO = 3.6; // Datasheet recommended clean-air ratio
@@ -31,9 +31,9 @@ const float MQ135_CLEAN_AIR_RATIO = 3.6; // Datasheet recommended clean-air rati
 const uint8_t DHT_PIN = 4;    // GPIO connected to DHT11 data pin
 const uint8_t DHT_TYPE = DHT11;
 
-const uint8_t HYSRF05_TRIG_PIN = 5;  // GPIO to drive HY-SRF05 trigger
-const uint8_t HYSRF05_ECHO_PIN = 18; // GPIO to read HY-SRF05 echo
-const uint16_t HYSRF05_MAX_DISTANCE_CM = 400; // Maximum distance to measure
+const uint8_t HYSRF_TRIG_PIN = 5;  // GPIO to drive HY-SRF05 trigger
+const uint8_t HYSRF_ECHO_PIN = 18; // GPIO to read HY-SRF05 echo
+const uint16_t ULTRASONIC_MAX_DISTANCE_CM = 400; // Maximum distance to measure
 
 // ---- User configuration ----
 const char* WIFI_SSID = "Arman";
@@ -61,8 +61,8 @@ const uint32_t UPLOAD_INTERVAL_MS_DEMO = 5000; // Try to upload every 5s
 const uint32_t SAMPLE_INTERVAL_MS = 600000;  // Add a reading every 10m
 const uint32_t UPLOAD_INTERVAL_MS = 3600000; // Try to upload every 1h
 const bool ONLY_UPLOAD_WHEN_REQUESTED = true; // true = honor /pending-requests flag
-const size_t BATCH_SIZE = 100000000;               // Max records per POST
-const bool ENABLE_HTTP_DATA_ENDPOINT = true; // expose GET /data for admin "Refresh"
+const size_t BATCH_SIZE = 100000000;          // Max records per POST
+const bool ENABLE_HTTP_DATA_ENDPOINT = true;  // expose GET /data for admin "Refresh"
 const uint16_t DATA_HTTP_PORT = 80;
 
 // ---- Internal state ----
@@ -84,7 +84,7 @@ String jwtToken;
 
 MQUnifiedsensor mq135(MQ135_BOARD, MQ135_VOLTAGE, MQ135_ADC_RESOLUTION, MQ135_PIN, "MQ-135");
 DHT dht(DHT_PIN, DHT_TYPE);
-NewPing sonar(HYSRF05_TRIG_PIN, HYSRF05_ECHO_PIN, HYSRF05_MAX_DISTANCE_CM);
+NewPing sonar(HYSRF_TRIG_PIN, HYSRF_ECHO_PIN, ULTRASONIC_MAX_DISTANCE_CM);
 
 #if USE_TLS
 WiFiClientSecure netClient;
@@ -100,6 +100,11 @@ String baseUrl() {
 
 size_t recordAddress(uint32_t index) {
   return EEPROM_HEADER_BYTES + (index % MAX_RECORDS) * sizeof(Reading);
+}
+
+String valueOrNan(float value, uint8_t decimals) {
+  if (isnan(value)) return String("nan");
+  return String(value, static_cast<unsigned int>(decimals));
 }
 
 void persistIndexes() {
@@ -131,7 +136,7 @@ void initializeSensors() {
     delay(200);
   }
   r0 /= samples;
-  if (isnan(r0) || r0 == 0) {
+  if (isnan(r0) || r0 <= 0) {
     Serial.println("MQ135 calibration failed; using default R0");
     r0 = 10; // fallback value to keep readings finite
   }
@@ -161,9 +166,9 @@ bool ensureWifi() {
 bool login() {
   if (!ensureWifi()) return false;
 
-  #if USE_TLS
-    netClient.setCACert(ROOT_CA);
-  #endif
+#if USE_TLS
+  netClient.setCACert(ROOT_CA);
+#endif
 
   HTTPClient http;
   const String url = baseUrl() + "/api/devices/login";
@@ -202,7 +207,7 @@ bool ensureAuthenticated() {
   if (!jwtToken.isEmpty()) {
     return true;
   }
-  
+
   return login();
 }
 
@@ -216,7 +221,7 @@ bool pollForUpload() {
   int code = http.GET();
   if (code != HTTP_CODE_OK) {
     http.end();
-    Serial.println("Not Requested");    
+    Serial.println("Not Requested");
     return false;
   }
   String body = http.getString();
@@ -231,10 +236,6 @@ bool pollForUpload() {
 
 String makePayload(const Reading& r) {
   // String payload matches DeviceDataRecord.payload expected by the backend.
-  auto valueOrNan = [](float value, uint8_t decimals) {
-    return isnan(value) ? String("nan") : String(value, decimals);
-  };
-
   String payload = "mq135=" + valueOrNan(r.mq135, 2);
   payload += ",tempC=" + valueOrNan(r.temperatureC, 1);
   payload += ",humidity=" + valueOrNan(r.humidity, 1);
@@ -242,30 +243,9 @@ String makePayload(const Reading& r) {
   return payload;
 }
 
-void sampleAndStore() {
-  mq135.update();
-  float mqPpm = mq135.readSensor();
-  if (isnan(mqPpm)) {
-    Serial.println("MQ135 read failed");
-  }
-
-  float temperatureC = dht.readTemperature();
-  float humidity = dht.readHumidity();
-  if (isnan(temperatureC) || isnan(humidity)) {
-    Serial.println("DHT11 read failed");
-  }
-
-  float distanceCm = sonar.ping_cm();
-  if (distanceCm == 0) {
-    distanceCm = NAN; // treat out-of-range as missing
-  }
-
-  saveReading(mqPpm, temperatureC, humidity, distanceCm);
-}
-
 bool sendBatch() {
   Serial.println("Transmition Attempt");
-  if (sendIndex >= writeIndex){    
+  if (sendIndex >= writeIndex) {
     Serial.println("No Data");
     return true;
   } // nothing to send
@@ -310,7 +290,7 @@ bool sendBatch() {
   if (acked >= sendIndex && acked < writeIndex) {
     sendIndex = acked + 1;
     persistIndexes();
-  }  
+  }
   Serial.printf("Upload complete: %d\n", code);
   return true;
 }
@@ -336,6 +316,15 @@ void handleDataEndpoint() {
   server.send(200, "application/json", body);
 }
 
+// ---- Sensor sampling ----
+float sampleDistanceCm() {
+  unsigned long distance = sonar.ping_cm();
+  if (distance == 0) {
+    return NAN; // out of range
+  }
+  return static_cast<float>(distance);
+}
+
 void saveReading(float mq135, float tempC, float humidity, float distanceCm) {
   if (writeIndex - sendIndex >= MAX_RECORDS) {
     // Prevent overwriting unsent data by advancing the send cursor.
@@ -347,6 +336,33 @@ void saveReading(float mq135, float tempC, float humidity, float distanceCm) {
   persistIndexes();
 }
 
+void sampleAndStore() {
+  mq135.update();
+  float mqPpm = mq135.readSensor();
+  if (isnan(mqPpm)) {
+    Serial.println("MQ135 read failed");
+  }
+
+  float temperatureC = dht.readTemperature();
+  float humidity = dht.readHumidity();
+  if (isnan(temperatureC) || isnan(humidity)) {
+    Serial.println("DHT11 read failed");
+  }
+
+  float distanceCm = sampleDistanceCm();
+  if (isnan(distanceCm)) {
+    Serial.println("Distance read failed");
+  }
+
+  saveReading(mqPpm, temperatureC, humidity, distanceCm);
+
+  String logLine = "Sampled mq135=" + valueOrNan(mqPpm, 2) + "ppm";
+  logLine += " tempC=" + valueOrNan(temperatureC, 1);
+  logLine += " humidity=" + valueOrNan(humidity, 1) + "%";
+  logLine += " distance=" + valueOrNan(distanceCm, 1) + "cm";
+  Serial.println(logLine);
+}
+
 // ---- Arduino lifecycle ----
 unsigned long lastSampleMs = 0;
 unsigned long lastUploadMs = 0;
@@ -356,10 +372,13 @@ void setup() {
   EEPROM.begin(EEPROM_BYTES);
   loadIndexes();
   initializeSensors();
+  pinMode(HYSRF_TRIG_PIN, OUTPUT);
+  pinMode(HYSRF_ECHO_PIN, INPUT);
+  pinMode(MQ135_PIN, INPUT);
 
-  if (ensureWifi()==true) { 
+  if (ensureWifi() == true) {
     Serial.println("wifi connected");
-  }else {
+  } else {
     Serial.println("wifi didn't connect");
   }
   ensureAuthenticated();
@@ -371,7 +390,6 @@ void setup() {
 }
 
 void loop() {
-  
   const unsigned long now = millis();
 
   if (now - lastSampleMs >= SAMPLE_INTERVAL_MS_DEMO) {
@@ -380,10 +398,11 @@ void loop() {
   }
 
   if (sendIndex < writeIndex && (pollForUpload() || (now - lastUploadMs >= UPLOAD_INTERVAL_MS_DEMO))) {
-    if(sendBatch())
+    if (sendBatch()) {
       lastUploadMs = now;
+    }
   }
-  
+
   server.handleClient();
   delay(50);
 }
