@@ -21,6 +21,20 @@
 #include <NewPing.h>
 #include <MQUnifiedsensor.h>
 
+// ---- Hardware configuration ----
+const uint8_t MQ135_PIN = 34;           // ADC pin for MQ135 sensor
+const char* MQ135_BOARD = "ESP-32";    // Board identifier for MQUnifiedsensor
+const float MQ135_VOLTAGE = 3.3;        // ESP32 ADC reference voltage
+const uint16_t MQ135_ADC_RESOLUTION = 12;
+const float MQ135_CLEAN_AIR_RATIO = 3.6; // Datasheet recommended clean-air ratio
+
+const uint8_t DHT_PIN = 4;    // GPIO connected to DHT11 data pin
+const uint8_t DHT_TYPE = DHT11;
+
+const uint8_t HYSRF05_TRIG_PIN = 5;  // GPIO to drive HY-SRF05 trigger
+const uint8_t HYSRF05_ECHO_PIN = 18; // GPIO to read HY-SRF05 echo
+const uint16_t HYSRF05_MAX_DISTANCE_CM = 400; // Maximum distance to measure
+
 // ---- User configuration ----
 const char* WIFI_SSID = "Arman";
 const char* WIFI_PASSWORD = "2apple3657";
@@ -55,9 +69,9 @@ const uint16_t DATA_HTTP_PORT = 80;
 struct Reading {
   uint32_t sequence;
   float mq135;
-  float temperature;
+  float temperatureC;
   float humidity;
-  float distance;
+  float distanceCm;
 };
 
 const size_t MAX_RECORDS = 64;
@@ -67,6 +81,10 @@ const size_t EEPROM_BYTES = EEPROM_HEADER_BYTES + MAX_RECORDS * sizeof(Reading);
 uint32_t writeIndex = 0;
 uint32_t sendIndex = 0;
 String jwtToken;
+
+MQUnifiedsensor mq135(MQ135_BOARD, MQ135_VOLTAGE, MQ135_ADC_RESOLUTION, MQ135_PIN, "MQ-135");
+DHT dht(DHT_PIN, DHT_TYPE);
+NewPing sonar(HYSRF05_TRIG_PIN, HYSRF05_ECHO_PIN, HYSRF05_MAX_DISTANCE_CM);
 
 #if USE_TLS
 WiFiClientSecure netClient;
@@ -97,6 +115,29 @@ void loadIndexes() {
     writeIndex = 0;
     sendIndex = 0;
   }
+}
+
+void initializeSensors() {
+  mq135.setRegressionMethod(1); // ppm = a*ratio^b
+  mq135.setA(110.47);
+  mq135.setB(-2.862);
+  mq135.init();
+
+  float r0 = 0;
+  const uint8_t samples = 5;
+  for (uint8_t i = 0; i < samples; i++) {
+    mq135.update();
+    r0 += mq135.calibrate(MQ135_CLEAN_AIR_RATIO);
+    delay(200);
+  }
+  r0 /= samples;
+  if (isnan(r0) || r0 == 0) {
+    Serial.println("MQ135 calibration failed; using default R0");
+    r0 = 10; // fallback value to keep readings finite
+  }
+  mq135.setR0(r0);
+
+  dht.begin();
 }
 
 bool ensureWifi() {
@@ -190,11 +231,36 @@ bool pollForUpload() {
 
 String makePayload(const Reading& r) {
   // String payload matches DeviceDataRecord.payload expected by the backend.
-  String payload = "mq135=" + String(r.mq135, 2);
-  payload += ",tempC=" + String(r.temperatureC, 1);
-  payload += ",humidity=" + String(r.humidity, 1);
-  payload += ",distanceCm=" + String(r.distanceCm, 1);
+  auto valueOrNan = [](float value, uint8_t decimals) {
+    return isnan(value) ? String("nan") : String(value, decimals);
+  };
+
+  String payload = "mq135=" + valueOrNan(r.mq135, 2);
+  payload += ",tempC=" + valueOrNan(r.temperatureC, 1);
+  payload += ",humidity=" + valueOrNan(r.humidity, 1);
+  payload += ",distanceCm=" + valueOrNan(r.distanceCm, 1);
   return payload;
+}
+
+void sampleAndStore() {
+  mq135.update();
+  float mqPpm = mq135.readSensor();
+  if (isnan(mqPpm)) {
+    Serial.println("MQ135 read failed");
+  }
+
+  float temperatureC = dht.readTemperature();
+  float humidity = dht.readHumidity();
+  if (isnan(temperatureC) || isnan(humidity)) {
+    Serial.println("DHT11 read failed");
+  }
+
+  float distanceCm = sonar.ping_cm();
+  if (distanceCm == 0) {
+    distanceCm = NAN; // treat out-of-range as missing
+  }
+
+  saveReading(mqPpm, temperatureC, humidity, distanceCm);
 }
 
 bool sendBatch() {
@@ -289,6 +355,7 @@ void setup() {
   Serial.begin(115200);
   EEPROM.begin(EEPROM_BYTES);
   loadIndexes();
+  initializeSensors();
 
   if (ensureWifi()==true) { 
     Serial.println("wifi connected");
