@@ -16,9 +16,10 @@
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
 #include <EEPROM.h>
-#include <DHT.h>
 #include <WebServer.h>
+#include <DHT.h>
 #include <NewPing.h>
+#include <MQUnifiedsensor.h>
 
 // ---- User configuration ----
 const char* WIFI_SSID = "Arman";
@@ -40,12 +41,6 @@ const char* ROOT_CA =
     "-----END CERTIFICATE-----\n";
 #endif
 
-// Sensor pins (change to match your wiring).
-const int MQ135_PIN = 34;       // Analog input (ESP32 ADC pin)
-const int DHT_PIN = 4;          // DHT11 data pin
-const int HYSRF_TRIG_PIN = 5;   // HY-SRF05 trigger pin
-const int HYSRF_ECHO_PIN = 18;  // HY-SRF05 echo pin
-
 // Timing configuration.
 const uint32_t SAMPLE_INTERVAL_MS_DEMO = 1000;  // Add a reading every 1s
 const uint32_t UPLOAD_INTERVAL_MS_DEMO = 5000; // Try to upload every 5s
@@ -60,9 +55,9 @@ const uint16_t DATA_HTTP_PORT = 80;
 struct Reading {
   uint32_t sequence;
   float mq135;
-  float temperatureC;
+  float temperature;
   float humidity;
-  float distanceCm;
+  float distance;
 };
 
 const size_t MAX_RECORDS = 64;
@@ -72,9 +67,6 @@ const size_t EEPROM_BYTES = EEPROM_HEADER_BYTES + MAX_RECORDS * sizeof(Reading);
 uint32_t writeIndex = 0;
 uint32_t sendIndex = 0;
 String jwtToken;
-
-DHT dht(DHT_PIN, DHT11);
-NewPing sonar(HYSRF_TRIG_PIN, HYSRF_ECHO_PIN, MAX_DISTANCE);
 
 #if USE_TLS
 WiFiClientSecure netClient;
@@ -278,25 +270,6 @@ void handleDataEndpoint() {
   server.send(200, "application/json", body);
 }
 
-// ---- Sensor sampling ----
-float sampleMQ135() {
-  int raw = analogRead(MQ135_PIN);
-  // Convert to voltage (approximate; adjust for your board's reference).
-  return (raw / 4095.0f) * 3.3f;
-}
-
-float sampleDistanceCm() {
-  
-  unsigned long distance = sonar.ping_cm();
-
-  if (distance == 0) {
-    Serial.println("Out of range");
-    return NAN;
-  }
-
-  return distance; // sound speed conversion to cm
-}
-
 void saveReading(float mq135, float tempC, float humidity, float distanceCm) {
   if (writeIndex - sendIndex >= MAX_RECORDS) {
     // Prevent overwriting unsent data by advancing the send cursor.
@@ -308,30 +281,6 @@ void saveReading(float mq135, float tempC, float humidity, float distanceCm) {
   persistIndexes();
 }
 
-void sampleAndStore() {
-  float temp = dht.readTemperature();
-  float hum = dht.readHumidity();
-  if (isnan(temp) || isnan(hum)) {
-    Serial.println("DHT read failed");
-    temp=-300;
-    hum=-300;
-  }
-  float gas = sampleMQ135();
-  if (isnan(gas)) {
-    Serial.println("MQ135 read failed");
-    gas=-300;
-  }
-  
-  float distance = sampleDistanceCm();
-  if (isnan(distance)) {
-    Serial.println("Distance read failed");
-    distance =-300;
-  }
-  saveReading(gas, temp, hum, distance);
-  Serial.printf("Buffered seq %lu | mq135=%.2fV temp=%.1fC hum=%.1f%% dist=%.1fcm\n",
-                (unsigned long)(writeIndex - 1), gas, temp, hum, distance);
-}
-
 // ---- Arduino lifecycle ----
 unsigned long lastSampleMs = 0;
 unsigned long lastUploadMs = 0;
@@ -340,10 +289,6 @@ void setup() {
   Serial.begin(115200);
   EEPROM.begin(EEPROM_BYTES);
   loadIndexes();
-  dht.begin();
-  pinMode(HYSRF_TRIG_PIN, OUTPUT);
-  pinMode(HYSRF_ECHO_PIN, INPUT);
-  pinMode(MQ135_PIN, INPUT);
 
   if (ensureWifi()==true) { 
     Serial.println("wifi connected");
