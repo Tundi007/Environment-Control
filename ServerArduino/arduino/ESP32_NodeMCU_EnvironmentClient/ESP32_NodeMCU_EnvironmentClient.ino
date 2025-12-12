@@ -18,6 +18,7 @@
 #include <EEPROM.h>
 #include <DHT.h>
 #include <WebServer.h>
+#include <NewPing.h>
 
 // ---- User configuration ----
 const char* WIFI_SSID = "Arman";
@@ -73,6 +74,8 @@ uint32_t sendIndex = 0;
 String jwtToken;
 
 DHT dht(DHT_PIN, DHT11);
+NewPing sonar(HYSRF_TRIG_PIN, HYSRF_ECHO_PIN, MAX_DISTANCE);
+
 #if USE_TLS
 WiFiClientSecure netClient;
 #else
@@ -166,6 +169,7 @@ bool ensureAuthenticated() {
   if (!jwtToken.isEmpty()) {
     return true;
   }
+  
   return login();
 }
 
@@ -282,14 +286,15 @@ float sampleMQ135() {
 }
 
 float sampleDistanceCm() {
-  digitalWrite(HYSRF_TRIG_PIN, LOW);
-  delayMicroseconds(2);
-  digitalWrite(HYSRF_TRIG_PIN, HIGH);
-  delayMicroseconds(10);
-  digitalWrite(HYSRF_TRIG_PIN, LOW);
-  unsigned long duration = pulseIn(HYSRF_ECHO_PIN, HIGH, 30000); // 30 ms timeout
-  if (duration == 0) return NAN;
-  return duration / 58.2f; // sound speed conversion to cm
+  
+  unsigned long distance = sonar.ping_cm();
+
+  if (distance == 0) {
+    Serial.println("Out of range");
+    return NAN;
+  }
+
+  return distance; // sound speed conversion to cm
 }
 
 void saveReading(float mq135, float tempC, float humidity, float distanceCm) {
