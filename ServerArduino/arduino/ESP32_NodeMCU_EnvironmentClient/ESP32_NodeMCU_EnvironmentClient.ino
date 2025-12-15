@@ -64,7 +64,6 @@ const bool ONLY_UPLOAD_WHEN_REQUESTED = true; // true = honor /pending-requests 
 const size_t BATCH_SIZE = 100000000;          // Max records per POST
 const bool ENABLE_HTTP_DATA_ENDPOINT = true;  // expose GET /data for admin "Refresh"
 const uint16_t DATA_HTTP_PORT = 80;
-bool isPolled = false;
 
 // ---- Internal state ----
 struct Reading {
@@ -231,7 +230,6 @@ bool pollForUpload() {
   int flagIndex = body.indexOf("uploadRequested");
   if (flagIndex < 0) return false;
   int trueIndex = body.indexOf("true", flagIndex);
-  isPolled = true;
   return trueIndex > flagIndex;
 }
 
@@ -397,16 +395,11 @@ void loop() {
     sampleAndStore();
     lastSampleMs = now;
   }
+  
 
-  pollForUpload();
-
-  if(isPolled)
-    Serial.println("Upload Requested");
-
-  if (isPolled || (now - lastUploadMs >= UPLOAD_INTERVAL_MS_DEMO)) {
+  if (sendIndex < writeIndex && (pollForUpload() || (now - lastUploadMs >= UPLOAD_INTERVAL_MS_DEMO))) {
     if (sendBatch()) {
       lastUploadMs = now;
-      isPolled=false;
     }
   }
 
