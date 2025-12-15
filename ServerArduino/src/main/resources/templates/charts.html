@@ -74,7 +74,18 @@
 </div>
 
 <script th:inline="javascript">
-    const chartData = /*[[${chartDataJson}]]*/ '[]';
+    const chartDataRaw = /*[[${chartDataJson}]]*/ '[]';
+    const chartData = (() => {
+        if (Array.isArray(chartDataRaw)) {
+            return chartDataRaw;
+        }
+        try {
+            return JSON.parse(chartDataRaw || '[]');
+        } catch (err) {
+            console.warn('Failed to parse chart data, showing empty charts', err);
+            return [];
+        }
+    })();
 
     function buildDataset(points, key, label, color) {
         const filtered = points
