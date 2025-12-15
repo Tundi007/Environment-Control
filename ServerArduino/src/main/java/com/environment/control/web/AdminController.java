@@ -5,6 +5,7 @@ import com.environment.control.data.DeviceData;
 import com.environment.control.device.Device;
 import com.environment.control.device.DeviceCommunicationService;
 import com.environment.control.device.DeviceService;
+import com.environment.control.integration.ChatGptService;
 import com.environment.control.web.view.ChartDataPoint;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -25,14 +26,17 @@ public class AdminController {
     private final DeviceService deviceService;
     private final DataIngestionService dataIngestionService;
     private final DeviceCommunicationService deviceCommunicationService;
+    private final ChatGptService chatGptService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public AdminController(DeviceService deviceService,
                            DataIngestionService dataIngestionService,
-                           DeviceCommunicationService deviceCommunicationService) {
+                           DeviceCommunicationService deviceCommunicationService,
+                           ChatGptService chatGptService) {
         this.deviceService = deviceService;
         this.dataIngestionService = dataIngestionService;
         this.deviceCommunicationService = deviceCommunicationService;
+        this.chatGptService = chatGptService;
     }
 
     @GetMapping({"/", "/admin"})
@@ -63,6 +67,27 @@ public class AdminController {
         model.addAttribute("device", device);
         model.addAttribute("chartDataJson", points.isEmpty() ? "" : objectMapper.writeValueAsString(points));
         return "charts";
+    }
+
+    @GetMapping("/admin/devices/{deviceId}/analysis")
+    public String analyze(@PathVariable String deviceId, Model model) throws JsonProcessingException {
+        Device device = deviceService.findByDeviceId(deviceId).orElse(null);
+        if (device == null) {
+            return "redirect:/";
+        }
+        List<DeviceData> records = dataIngestionService.getData(device);
+        try {
+            String summary = chatGptService.summarizeDevice(device, records);
+            model.addAttribute("summary", summary);
+            model.addAttribute("error", null);
+        } catch (IllegalStateException e) {
+            model.addAttribute("error", e.getMessage());
+        } catch (Exception e) {
+            model.addAttribute("error", "Failed to contact ChatGPT: " + e.getMessage());
+        }
+        model.addAttribute("recordCount", records.size());
+        model.addAttribute("device", device);
+        return "analysis";
     }
 
     @PostMapping("/admin/devices")

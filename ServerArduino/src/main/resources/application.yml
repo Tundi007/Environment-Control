@@ -30,3 +30,6 @@ app:
   security:
     # Must be at least 32 bytes for HS256; override via env var in production.
     jwt-secret: change-this-key-to-a-very-long-random-string-123456
+  openai:
+    # Provide your OpenAI API key to enable ChatGPT device summaries.
+    api-key: ""
