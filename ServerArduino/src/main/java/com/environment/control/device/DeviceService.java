@@ -27,7 +27,11 @@ public class DeviceService {
         return deviceRepository.findAll();
     }
 
-    public Device register(String deviceId, String secret, String name, String endpointUrl) {
+    public Device register(String deviceId,
+                          String secret,
+                          String name,
+                          String endpointUrl,
+                          String remoteControlEndpoint) {
         deviceRepository.findByDeviceId(deviceId).ifPresent(existing -> {
             throw new DuplicateDeviceException(deviceId);
         });
@@ -36,6 +40,7 @@ public class DeviceService {
         device.setSecret(secret);
         device.setName(name);
         device.setEndpointUrl(endpointUrl);
+        device.setRemoteControlEndpoint(remoteControlEndpoint);
         try {
             return deviceRepository.save(device);
         } catch (DataIntegrityViolationException ex) {
@@ -46,18 +51,6 @@ public class DeviceService {
     @Transactional
     public void touch(Device device) {
         device.setLastSeen(Instant.now());
-        deviceRepository.save(device);
-    }
-
-    @Transactional
-    public void requestUpload(Device device) {
-        device.setUploadRequested(true);
-        deviceRepository.save(device);
-    }
-
-    @Transactional
-    public void clearRequest(Device device) {
-        device.setUploadRequested(false);
         deviceRepository.save(device);
     }
 
