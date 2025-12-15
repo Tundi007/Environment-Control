@@ -59,12 +59,12 @@ public class DeviceCommunicationService {
         return data;
     }
 
-    public boolean sendLedCommand(Device device, String command) {
-        if (device.getLedControlEndpoint() == null || device.getLedControlEndpoint().isBlank()) {
+    public boolean sendRemoteControlCommand(Device device, String command) {
+        if (device.getRemoteControlEndpoint() == null || device.getRemoteControlEndpoint().isBlank()) {
             return false;
         }
         try {
-            restTemplate.postForEntity(device.getLedControlEndpoint(), Map.of("command", command), Void.class);
+            restTemplate.postForEntity(device.getRemoteControlEndpoint(), Map.of("command", command), Void.class);
             return true;
         } catch (RestClientException ex) {
             return false;

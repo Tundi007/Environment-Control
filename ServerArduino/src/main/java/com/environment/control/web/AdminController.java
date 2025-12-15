@@ -99,8 +99,8 @@ public class AdminController {
                            @RequestParam String secret,
                            @RequestParam String name,
                            @RequestParam(required = false, defaultValue = "") String endpointUrl,
-                           @RequestParam(required = false, defaultValue = "") String ledControlEndpoint) {
-        deviceService.register(deviceId, secret, name, endpointUrl, ledControlEndpoint);
+                           @RequestParam(required = false, defaultValue = "") String remoteControlEndpoint) {
+        deviceService.register(deviceId, secret, name, endpointUrl, remoteControlEndpoint);
         return "redirect:/?selected=" + deviceId;
     }
 
@@ -110,20 +110,20 @@ public class AdminController {
         return "redirect:/?selected=" + deviceId;
     }
 
-    @GetMapping("/admin/devices/{deviceId}/led-control")
-    public String ledControl(@PathVariable String deviceId, Model model) {
+    @GetMapping("/admin/devices/{deviceId}/remote-control")
+    public String remoteControl(@PathVariable String deviceId, Model model) {
         Device device = deviceService.findByDeviceId(deviceId).orElse(null);
         if (device == null) {
             return "redirect:/";
         }
         model.addAttribute("device", device);
-        return "led-control";
+        return "remote-control";
     }
 
-    @PostMapping("/admin/devices/{deviceId}/led-control")
-    public String sendLedCommand(@PathVariable String deviceId,
-                                 @RequestParam String command,
-                                 RedirectAttributes redirectAttributes) {
+    @PostMapping("/admin/devices/{deviceId}/remote-control")
+    public String sendRemoteControlCommand(@PathVariable String deviceId,
+                                           @RequestParam String command,
+                                           RedirectAttributes redirectAttributes) {
         Device device = deviceService.findByDeviceId(deviceId).orElse(null);
         if (device == null) {
             return "redirect:/";
@@ -131,25 +131,25 @@ public class AdminController {
 
         if (!"increase".equalsIgnoreCase(command) && !"decrease".equalsIgnoreCase(command)) {
             redirectAttributes.addFlashAttribute("status", "error");
-            redirectAttributes.addFlashAttribute("message", "Unknown LED command.");
-            return "redirect:/admin/devices/" + deviceId + "/led-control";
+            redirectAttributes.addFlashAttribute("message", "Unknown remote control command.");
+            return "redirect:/admin/devices/" + deviceId + "/remote-control";
         }
 
-        if (device.getLedControlEndpoint() == null || device.getLedControlEndpoint().isBlank()) {
+        if (device.getRemoteControlEndpoint() == null || device.getRemoteControlEndpoint().isBlank()) {
             redirectAttributes.addFlashAttribute("status", "error");
-            redirectAttributes.addFlashAttribute("message", "No LED control endpoint configured for this device.");
-            return "redirect:/admin/devices/" + deviceId + "/led-control";
+            redirectAttributes.addFlashAttribute("message", "No remote control endpoint configured for this device.");
+            return "redirect:/admin/devices/" + deviceId + "/remote-control";
         }
 
         String normalizedCommand = command.toLowerCase();
-        boolean sent = deviceCommunicationService.sendLedCommand(device, normalizedCommand);
+        boolean sent = deviceCommunicationService.sendRemoteControlCommand(device, normalizedCommand);
         redirectAttributes.addFlashAttribute("status", sent ? "success" : "error");
         redirectAttributes.addFlashAttribute(
                 "message",
                 sent
                         ? "Sent '" + normalizedCommand + "' command to the device."
                         : "Failed to reach the device for the requested command.");
-        return "redirect:/admin/devices/" + deviceId + "/led-control";
+        return "redirect:/admin/devices/" + deviceId + "/remote-control";
     }
 
     @PostMapping("/admin/devices/{deviceId}/delete")

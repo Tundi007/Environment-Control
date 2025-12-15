@@ -26,7 +26,8 @@ public class Device {
 
     private String endpointUrl;
 
-    private String ledControlEndpoint;
+    @Column(name = "ledControlEndpoint")
+    private String remoteControlEndpoint;
 
     @Column(nullable = false)
     private boolean uploadRequested = false;
@@ -71,12 +72,12 @@ public class Device {
         this.endpointUrl = endpointUrl;
     }
 
-    public String getLedControlEndpoint() {
-        return ledControlEndpoint;
+    public String getRemoteControlEndpoint() {
+        return remoteControlEndpoint;
     }
 
-    public void setLedControlEndpoint(String ledControlEndpoint) {
-        this.ledControlEndpoint = ledControlEndpoint;
+    public void setRemoteControlEndpoint(String remoteControlEndpoint) {
+        this.remoteControlEndpoint = remoteControlEndpoint;
     }
 
     public boolean isUploadRequested() {

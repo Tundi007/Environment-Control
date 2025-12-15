@@ -31,7 +31,7 @@ public class DeviceService {
                           String secret,
                           String name,
                           String endpointUrl,
-                          String ledControlEndpoint) {
+                          String remoteControlEndpoint) {
         deviceRepository.findByDeviceId(deviceId).ifPresent(existing -> {
             throw new DuplicateDeviceException(deviceId);
         });
@@ -40,7 +40,7 @@ public class DeviceService {
         device.setSecret(secret);
         device.setName(name);
         device.setEndpointUrl(endpointUrl);
-        device.setLedControlEndpoint(ledControlEndpoint);
+        device.setRemoteControlEndpoint(remoteControlEndpoint);
         try {
             return deviceRepository.save(device);
         } catch (DataIntegrityViolationException ex) {

@@ -143,7 +143,7 @@
                     <input name="endpointUrl" placeholder="Device endpoint (optional)" title="Endpoint to poll data directly from the device">
                 </div>
                 <div class="form-row">
-                    <input name="ledControlEndpoint" placeholder="LED control endpoint (optional)" title="Endpoint that accepts increase/decrease commands for the LED">
+                    <input name="remoteControlEndpoint" placeholder="Remote control endpoint (optional)" title="Endpoint that accepts increase/decrease commands for remote control">
                 </div>
                 <div>
                     <button class="btn-primary" type="submit">Save device</button>
@@ -172,7 +172,7 @@
                     </div>
                     <div class="muted" th:if="${device.lastSeen != null}" th:text="${'Seen ' + device.lastSeen}"></div>
                     <div class="actions">
-                        <a class="pill" th:href="@{'/admin/devices/' + ${device.deviceId} + '/led-control'}" target="_blank" rel="noopener">LED control</a>
+                        <a class="pill" th:href="@{'/admin/devices/' + ${device.deviceId} + '/remote-control'}" target="_blank" rel="noopener">Remote control</a>
                         <a class="pill" th:href="@{'/?selected=' + ${device.deviceId}}">View data</a>
                         <a class="pill" th:href="@{'/admin/devices/' + ${device.deviceId} + '/charts'}" target="_blank" rel="noopener">Open charts</a>
                         <form th:action="@{'/admin/devices/' + ${device.deviceId} + '/analysis'}" method="get" target="_blank">
