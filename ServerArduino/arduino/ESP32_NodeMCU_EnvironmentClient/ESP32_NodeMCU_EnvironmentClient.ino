@@ -414,8 +414,6 @@ void setup() {
   pinMode(HYSRF_TRIG_PIN, OUTPUT);
   pinMode(HYSRF_ECHO_PIN, INPUT);
   pinMode(MQ135_PIN, INPUT);
-  ledcSetup(LED_PWM_CHANNEL, LED_PWM_FREQUENCY, LED_PWM_RESOLUTION);
-  ledcAttachPin(LED_OUTPUT_PIN, LED_PWM_CHANNEL);
   applyLedOutput();
 
   if (ensureWifi() == true) {
@@ -439,17 +437,18 @@ void setup() {
 void loop() {
   const unsigned long now = millis();
 
-  if (now - lastSampleMs >= SAMPLE_INTERVAL_MS_DEMO) {
+  if (sendIndex < writeIndex && (now - lastSampleMs >= SAMPLE_INTERVAL_MS)) {
+    pollForUpload();
     sampleAndStore();
     lastSampleMs = now;
+    sendBatch();
   }
   
-
-  if (sendIndex < writeIndex && (pollForUpload() || (now - lastUploadMs >= UPLOAD_INTERVAL_MS_DEMO))) {
-    if (sendBatch()) {
-      lastUploadMs = now;
-    }
-  }
+  // if (sendIndex < writeIndex && (pollForUpload() || (now - lastUploadMs >= UPLOAD_INTERVAL_MS))) {
+  //   if (sendBatch()) {
+  //     lastUploadMs = now;
+  //   }
+  // }
 
   server.handleClient();
   delay(50);
