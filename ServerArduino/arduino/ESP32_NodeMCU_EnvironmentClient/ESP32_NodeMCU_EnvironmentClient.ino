@@ -492,5 +492,5 @@ void loop() {
   }
 
   server.handleClient();
-  delay(50);
+  delay(500);
 }
