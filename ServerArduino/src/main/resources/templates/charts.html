@@ -32,7 +32,8 @@
         .pill { display: inline-flex; align-items: center; padding: 6px 10px; border: 1px solid var(--border); border-radius: 999px; color: #cbd5e1; text-decoration: none; gap: 6px; }
         .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 18px; box-shadow: 0 16px 50px rgba(0,0,0,0.35); }
         .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px; }
-        canvas { width: 100%; height: 280px; }
+        .chart-wrapper { position: relative; height: 280px; }
+        .chart-wrapper canvas { width: 100%; height: 100%; display: block; }
         .empty { text-align: center; color: var(--muted); padding: 18px; }
     </style>
 </head>
@@ -56,28 +57,48 @@
     <div th:if="${!#strings.isEmpty(chartDataJson)}" class="grid">
         <div class="panel">
             <h3 style="margin-top:0;">Air Quality (MQ135)</h3>
-            <canvas id="mq135Chart" aria-label="MQ135 readings over time"></canvas>
+            <div class="chart-wrapper">
+                <canvas id="mq135Chart" aria-label="MQ135 readings over time"></canvas>
+            </div>
         </div>
         <div class="panel">
             <h3 style="margin-top:0;">Humidity</h3>
-            <canvas id="humidityChart" aria-label="Humidity readings over time"></canvas>
+            <div class="chart-wrapper">
+                <canvas id="humidityChart" aria-label="Humidity readings over time"></canvas>
+            </div>
         </div>
         <div class="panel">
             <h3 style="margin-top:0;">Temperature</h3>
-            <canvas id="temperatureChart" aria-label="Temperature readings over time"></canvas>
+            <div class="chart-wrapper">
+                <canvas id="temperatureChart" aria-label="Temperature readings over time"></canvas>
+            </div>
         </div>
         <div class="panel">
             <h3 style="margin-top:0;">Distance</h3>
-            <canvas id="distanceChart" aria-label="Distance readings over time"></canvas>
+            <div class="chart-wrapper">
+                <canvas id="distanceChart" aria-label="Distance readings over time"></canvas>
+            </div>
         </div>
     </div>
 </div>
 
 <script th:inline="javascript">
-    const chartData = /*[[${chartDataJson}]]*/ '[]';
+    const chartDataRaw = /*[[${chartDataJson}]]*/ '[]';
+    const chartData = (() => {
+        if (Array.isArray(chartDataRaw)) {
+            return chartDataRaw;
+        }
+        try {
+            return JSON.parse(chartDataRaw || '[]');
+        } catch (err) {
+            console.warn('Failed to parse chart data, showing empty charts', err);
+            return [];
+        }
+    })();
 
     function buildDataset(points, key, label, color) {
-        const filtered = points
+        const filtered = [...points]
+            .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
             .filter(point => point[key] !== null)
             .map(point => ({x: new Date(point.timestamp), y: point[key]}));
         return {
@@ -93,9 +114,9 @@
 
     function renderChart(canvasId, dataset, yLabel) {
         const canvas = document.getElementById(canvasId);
+        const wrapper = canvas.parentElement;
         if (!dataset.data.length) {
-            canvas.insertAdjacentHTML('afterend', '<p class="empty">No data available.</p>');
-            canvas.remove();
+            wrapper.innerHTML = '<p class="empty">No data available.</p>';
             return;
         }
         new Chart(canvas, {
