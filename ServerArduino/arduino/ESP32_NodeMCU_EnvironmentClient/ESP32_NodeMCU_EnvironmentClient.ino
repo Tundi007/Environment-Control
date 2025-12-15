@@ -340,14 +340,8 @@ void sampleAndStore() {
 
   float temperatureC = dht.readTemperature();
   float humidity = dht.readHumidity();
-  if (isnan(temperatureC) || isnan(humidity)) {
-    Serial.println("DHT11 read failed");
-  }
 
   float distanceCm = sampleDistanceCm();
-  if (isnan(distanceCm)) {
-    Serial.println("Distance read failed");
-  }
 
   saveReading(mqPpm, temperatureC, humidity, distanceCm);
 
