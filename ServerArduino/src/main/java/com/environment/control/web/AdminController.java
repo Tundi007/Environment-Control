@@ -10,6 +10,7 @@ import com.environment.control.web.view.ChartDataPoint;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -124,33 +125,75 @@ public class AdminController {
     }
 
     private ChartDataPoint toChartPoint(DeviceData data) {
-        try {
-            Map<String, Object> payload = objectMapper.readValue(data.getPayload(), new TypeReference<Map<String, Object>>() {
-            });
-            Double mq135 = toDouble(payload.get("mq135"));
-            Double humidity = toDouble(payload.get("humidity"));
-            Double temperature = toDouble(payload.get("temperature"));
-            Double distance = toDouble(payload.get("distance"));
-            if (mq135 == null && humidity == null && temperature == null && distance == null) {
-                return null;
-            }
-            return new ChartDataPoint(data.getCreatedAt(), mq135, humidity, temperature, distance);
-        } catch (Exception e) {
+        Map<String, Object> payload = parsePayload(data.getPayload());
+        Double mq135 = toDouble(payload.get("mq135"));
+        Double humidity = toDouble(payload.get("humidity"));
+        Double temperature = toDouble(payload.get("temperature"));
+        Double distance = toDouble(payload.get("distance"));
+        if (mq135 == null && humidity == null && temperature == null && distance == null) {
             return null;
+        }
+        return new ChartDataPoint(data.getCreatedAt(), mq135, humidity, temperature, distance);
+    }
+
+    private Map<String, Object> parsePayload(String payloadString) {
+        if (payloadString == null || payloadString.isBlank()) {
+            return Map.of();
+        }
+
+        // Try JSON payload first
+        try {
+            Map<String, Object> parsed = objectMapper.readValue(
+                    payloadString,
+                    new TypeReference<Map<String, Object>>() {
+                    });
+            return normalizeKeys(parsed);
+        } catch (Exception ignored) {
+            // Fall back to simple comma-separated key=value pairs
+        }
+
+        Map<String, Object> parsed = new HashMap<>();
+        for (String entry : payloadString.split(",")) {
+            String[] parts = entry.split("=", 2);
+            if (parts.length != 2) {
+                continue;
+            }
+            parsed.put(parts[0].trim(), parts[1].trim());
+        }
+        return normalizeKeys(parsed);
+    }
+
+    private Map<String, Object> normalizeKeys(Map<String, Object> raw) {
+        Map<String, Object> normalized = new HashMap<>();
+        copyIfPresent(raw, normalized, "mq135", "mq135");
+        copyIfPresent(raw, normalized, "humidity", "humidity");
+        copyIfPresent(raw, normalized, "temperature", "temperature");
+        copyIfPresent(raw, normalized, "tempC", "temperature");
+        copyIfPresent(raw, normalized, "distance", "distance");
+        copyIfPresent(raw, normalized, "distanceCm", "distance");
+        return normalized;
+    }
+
+    private void copyIfPresent(Map<String, Object> source, Map<String, Object> target, String from, String to) {
+        if (source.containsKey(from)) {
+            target.put(to, source.get(from));
         }
     }
 
     private Double toDouble(Object value) {
-        if (value instanceof Number number) {
-            return number.doubleValue();
-        }
-        if (value != null) {
+        Double number = null;
+        if (value instanceof Number num) {
+            number = num.doubleValue();
+        } else if (value != null) {
             try {
-                return Double.parseDouble(value.toString());
+                number = Double.parseDouble(value.toString());
             } catch (NumberFormatException ignored) {
                 return null;
             }
         }
-        return null;
+        if (number == null || !Double.isFinite(number)) {
+            return null;
+        }
+        return number;
     }
 }
