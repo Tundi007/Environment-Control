@@ -88,6 +88,7 @@ uint32_t writeIndex = 0;
 uint32_t sendIndex = 0;
 String jwtToken;
 uint8_t ledBrightness = 64; // starting PWM duty cycle (0-255)
+const int8_t REMOTE_CONTROL_STEP = 25; // PWM delta per remote control request
 
 MQUnifiedsensor mq135(MQ135_BOARD, MQ135_VOLTAGE, MQ135_ADC_RESOLUTION, MQ135_PIN, "MQ-135");
 DHT dht(DHT_PIN, DHT_TYPE);
@@ -139,6 +140,23 @@ void adjustLedOutput(int8_t delta) {
   if (updated > 255) updated = 255;
   ledBrightness = static_cast<uint8_t>(updated);
   applyLedOutput();
+}
+
+bool processRemoteControlCommand(const String& rawCommand, String& response) {
+  String command = rawCommand;
+  command.toLowerCase();
+
+  if (command == "increase") {
+    adjustLedOutput(REMOTE_CONTROL_STEP);
+  } else if (command == "decrease") {
+    adjustLedOutput(-REMOTE_CONTROL_STEP);
+  } else {
+    response = "{\"status\":\"error\",\"message\":\"Unknown command\"}";
+    return false;
+  }
+
+  response = "{\"status\":\"ok\",\"brightness\":" + String(ledBrightness) + "}";
+  return true;
 }
 
 String extractCommand(String rawBody) {
@@ -331,16 +349,39 @@ void handleRemoteControl() {
   }
 
   command.toLowerCase();
-  if (command == "increase") {
-    adjustLedOutput(25);
-  } else if (command == "decrease") {
-    adjustLedOutput(-25);
-  } else {
-    server.send(400, "application/json", "{\"status\":\"error\",\"message\":\"Unknown command\"}");
+  String response;
+  if (!processRemoteControlCommand(command, response)) {
+    server.send(400, "application/json", response);
     return;
   }
 
-  String response = "{\"status\":\"ok\",\"brightness\":" + String(ledBrightness) + "}";
+  server.send(200, "application/json", response);
+}
+
+void handleWebRemoteControl() {
+  if (!ENABLE_REMOTE_CONTROL_ENDPOINT) {
+    server.send(404, "text/plain", "disabled");
+    return;
+  }
+
+  String command;
+  if (server.hasArg("command")) {
+    command = server.arg("command");
+  } else {
+    command = extractCommand(server.arg("plain"));
+  }
+
+  if (command.isEmpty()) {
+    server.send(400, "application/json", "{\"status\":\"error\",\"message\":\"Missing command\"}");
+    return;
+  }
+
+  String response;
+  if (!processRemoteControlCommand(command, response)) {
+    server.send(400, "application/json", response);
+    return;
+  }
+
   server.send(200, "application/json", response);
 }
 
@@ -430,6 +471,7 @@ void setup() {
   }
   if (ENABLE_REMOTE_CONTROL_ENDPOINT) {
     server.on("/remote-control", HTTP_POST, handleRemoteControl);
+    server.on("/remote-control/web", HTTP_POST, handleWebRemoteControl);
   }
   if (ENABLE_HTTP_DATA_ENDPOINT || ENABLE_REMOTE_CONTROL_ENDPOINT) {
     server.begin();
