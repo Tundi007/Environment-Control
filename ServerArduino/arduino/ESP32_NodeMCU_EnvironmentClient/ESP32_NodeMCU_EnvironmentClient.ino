@@ -55,15 +55,16 @@ const char* ROOT_CA =
     "-----END CERTIFICATE-----\n";
 #endif
 
-// Timing configuration.
-const uint32_t SAMPLE_INTERVAL_MS_DEMO = 1000;  // Add a reading every 1s
+// configuration.
+const uint32_t SAMPLE_INTERVAL_MS_DEMO = 2000;  // Add a reading every 1s
 const uint32_t UPLOAD_INTERVAL_MS_DEMO = 5000; // Try to upload every 5s
 const uint32_t SAMPLE_INTERVAL_MS = 600000;  // Add a reading every 10m
 const uint32_t UPLOAD_INTERVAL_MS = 3600000; // Try to upload every 1h
-const bool ONLY_UPLOAD_WHEN_REQUESTED = true; // true = honor /pending-requests flag
+const bool ONLY_UPLOAD_WHEN_REQUESTED = false; // true = honor /pending-requests flag
 const size_t BATCH_SIZE = 100000000;          // Max records per POST
 const bool ENABLE_HTTP_DATA_ENDPOINT = true;  // expose GET /data for admin "Refresh"
 const uint16_t DATA_HTTP_PORT = 80;
+bool isPolled = false;
 
 // ---- Internal state ----
 struct Reading {
@@ -230,7 +231,7 @@ bool pollForUpload() {
   int flagIndex = body.indexOf("uploadRequested");
   if (flagIndex < 0) return false;
   int trueIndex = body.indexOf("true", flagIndex);
-  Serial.println("Upload Requested");
+  isPolled = true;
   return trueIndex > flagIndex;
 }
 
@@ -392,14 +393,20 @@ void setup() {
 void loop() {
   const unsigned long now = millis();
 
-  if (now - lastSampleMs >= SAMPLE_INTERVAL_MS_DEMO) {
+  if (now - lastSampleMs >= SAMPLE_INTERVAL_MS) {
     sampleAndStore();
     lastSampleMs = now;
   }
 
-  if (sendIndex < writeIndex && (pollForUpload() || (now - lastUploadMs >= UPLOAD_INTERVAL_MS_DEMO))) {
+  pollForUpload();
+
+  if(isPolled)
+    Serial.println("Upload Requested");
+
+  if (sendIndex < writeIndex && (isPolled || (now - lastUploadMs >= SAMPLE_INTERVAL_MS))) {
     if (sendBatch()) {
       lastUploadMs = now;
+      isPolled=false;
     }
   }
 
