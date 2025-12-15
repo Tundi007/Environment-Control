@@ -172,6 +172,9 @@
                     <div class="actions">
                         <a class="pill" th:href="@{'/?selected=' + ${device.deviceId}}">View data</a>
                         <a class="pill" th:href="@{'/admin/devices/' + ${device.deviceId} + '/charts'}" target="_blank" rel="noopener">Open charts</a>
+                        <form th:action="@{'/admin/devices/' + ${device.deviceId} + '/analysis'}" method="get" target="_blank">
+                            <button class="btn-secondary" type="submit">ChatGPT summary</button>
+                        </form>
                         <form th:action="@{'/admin/devices/' + ${device.deviceId} + '/refresh'}" method="post">
                             <button class="btn-secondary" type="submit">Sync now</button>
                         </form>
