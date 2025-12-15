@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title th:text="${device.name} + ' Remote Control'">Remote Control</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0f172a;
+            --panel: #111827;
+            --muted: #cbd5e1;
+            --accent: #22d3ee;
+            --accent-2: #a855f7;
+            --border: rgba(255, 255, 255, 0.06);
+            --success: #34d399;
+            --danger: #f87171;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background: radial-gradient(circle at 20% 20%, rgba(34,211,238,0.07), transparent 25%),
+                        radial-gradient(circle at 80% 0%, rgba(168,85,247,0.06), transparent 25%),
+                        var(--bg);
+            color: #e2e8f0;
+            min-height: 100vh;
+        }
+        .shell {
+            max-width: 720px;
+            margin: 0 auto;
+            padding: 36px 20px 60px;
+        }
+        .panel {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.35);
+        }
+        h1 { margin: 0 0 12px 0; }
+        .muted { color: var(--muted); }
+        .actions {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 12px;
+            margin-top: 20px;
+        }
+        button {
+            width: 100%;
+            padding: 14px 16px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            background: rgba(255,255,255,0.04);
+            color: #e2e8f0;
+            font-weight: 700;
+            font-size: 15px;
+            cursor: pointer;
+            transition: transform 0.1s ease, box-shadow 0.2s ease;
+        }
+        button:hover { transform: translateY(-1px); box-shadow: 0 12px 30px rgba(0,0,0,0.35); }
+        .btn-plus { background: linear-gradient(120deg, #22d3ee, #38bdf8); color: #0b1224; border: none; }
+        .btn-minus { background: linear-gradient(120deg, #fb7185, #fbbf24); color: #0b1224; border: none; }
+        .alert {
+            margin-top: 16px;
+            padding: 12px 14px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+        }
+        .alert.success { background: rgba(52,211,153,0.1); border-color: rgba(52,211,153,0.4); }
+        .alert.error { background: rgba(248,113,113,0.12); border-color: rgba(248,113,113,0.4); }
+        a { color: var(--accent); }
+    </style>
+</head>
+<body>
+<div class="shell">
+    <div class="panel">
+        <a href="/" class="muted" style="font-size: 13px; text-decoration: none;">← Back to dashboard</a>
+        <h1 th:text="${device.name} + ' remote control'"></h1>
+        <p class="muted">Send remote brightness commands directly to the device.</p>
+
+        <div class="muted" style="margin-top: 8px;">
+            Endpoint:
+            <span th:text="${device.remoteControlEndpoint != null and !device.remoteControlEndpoint.isBlank()} ? device.remoteControlEndpoint : 'Not configured'"></span>
+        </div>
+
+        <div th:if="${status != null}" class="alert" th:classappend="${status == 'success'} ? ' success' : ' error'" th:text="${message}"></div>
+
+        <div class="actions" th:if="${device.remoteControlEndpoint != null && !device.remoteControlEndpoint.isBlank()}">
+            <form th:action="@{'/admin/devices/' + ${device.deviceId} + '/remote-control'}" method="post">
+                <input type="hidden" name="command" value="increase">
+                <button type="submit" class="btn-plus">Increase (+)</button>
+            </form>
+            <form th:action="@{'/admin/devices/' + ${device.deviceId} + '/remote-control'}" method="post">
+                <input type="hidden" name="command" value="decrease">
+                <button type="submit" class="btn-minus">Decrease (-)</button>
+            </form>
+        </div>
+
+        <div class="alert error" th:if="${device.remoteControlEndpoint == null || device.remoteControlEndpoint.isBlank()}">
+            Configure a remote control endpoint for this device to enable commands.
+        </div>
+    </div>
+</div>
+</body>
+</html>

@@ -35,6 +35,11 @@ const uint8_t HYSRF_TRIG_PIN = 5;  // GPIO to drive HY-SRF05 trigger
 const uint8_t HYSRF_ECHO_PIN = 18; // GPIO to read HY-SRF05 echo
 const uint16_t ULTRASONIC_MAX_DISTANCE_CM = 400; // Maximum distance to measure
 
+const uint8_t LED_OUTPUT_PIN = 2;  // On-board LED for remote control output
+const uint8_t LED_PWM_CHANNEL = 0;
+const uint16_t LED_PWM_FREQUENCY = 5000;
+const uint8_t LED_PWM_RESOLUTION = 8; // 0-255 brightness
+
 // ---- User configuration ----
 const char* WIFI_SSID = "Arman";
 const char* WIFI_PASSWORD = "2apple3657";
@@ -59,11 +64,12 @@ const char* ROOT_CA =
 const uint32_t SAMPLE_INTERVAL_MS_DEMO = 3000;  // Add a reading every 1s
 const uint32_t UPLOAD_INTERVAL_MS_DEMO = 30000; 
 const uint32_t SAMPLE_INTERVAL_MS = 600000;  // Add a reading every 10m
-const uint32_t UPLOAD_INTERVAL_MS = 3600000; 
+const uint32_t UPLOAD_INTERVAL_MS = 3600000;
 const bool ONLY_UPLOAD_WHEN_REQUESTED = true; // true = honor /pending-requests flag
 const size_t BATCH_SIZE = 100000000;          // Max records per POST
 const bool ENABLE_HTTP_DATA_ENDPOINT = true;  // expose GET /data for admin "Refresh"
 const uint16_t DATA_HTTP_PORT = 80;
+const bool ENABLE_REMOTE_CONTROL_ENDPOINT = true; // expose POST /remote-control for brightness commands
 
 // ---- Internal state ----
 struct Reading {
@@ -81,6 +87,8 @@ const size_t EEPROM_BYTES = EEPROM_HEADER_BYTES + MAX_RECORDS * sizeof(Reading);
 uint32_t writeIndex = 0;
 uint32_t sendIndex = 0;
 String jwtToken;
+uint8_t ledBrightness = 64; // starting PWM duty cycle (0-255)
+const int8_t REMOTE_CONTROL_STEP = 25; // PWM delta per remote control request
 
 MQUnifiedsensor mq135(MQ135_BOARD, MQ135_VOLTAGE, MQ135_ADC_RESOLUTION, MQ135_PIN, "MQ-135");
 DHT dht(DHT_PIN, DHT_TYPE);
@@ -120,6 +128,42 @@ void loadIndexes() {
     writeIndex = 0;
     sendIndex = 0;
   }
+}
+
+void applyLedOutput() {
+  ledcWrite(LED_PWM_CHANNEL, ledBrightness);
+}
+
+void adjustLedOutput(int8_t delta) {
+  int16_t updated = static_cast<int16_t>(ledBrightness) + delta;
+  if (updated < 0) updated = 0;
+  if (updated > 255) updated = 255;
+  ledBrightness = static_cast<uint8_t>(updated);
+  applyLedOutput();
+}
+
+bool processRemoteControlCommand(const String& rawCommand, String& response) {
+  String command = rawCommand;
+  command.toLowerCase();
+
+  if (command == "increase") {
+    adjustLedOutput(REMOTE_CONTROL_STEP);
+  } else if (command == "decrease") {
+    adjustLedOutput(-REMOTE_CONTROL_STEP);
+  } else {
+    response = "{\"status\":\"error\",\"message\":\"Unknown command\"}";
+    return false;
+  }
+
+  response = "{\"status\":\"ok\",\"brightness\":" + String(ledBrightness) + "}";
+  return true;
+}
+
+String extractCommand(String rawBody) {
+  rawBody.toLowerCase();
+  if (rawBody.indexOf("increase") >= 0) return "increase";
+  if (rawBody.indexOf("decrease") >= 0) return "decrease";
+  return "";
 }
 
 void initializeSensors() {
@@ -294,6 +338,54 @@ bool sendBatch() {
 }
 
 // ---- Local HTTP endpoint for admin console "Refresh" ----
+void handleRemoteControl() {
+  if (!ENABLE_REMOTE_CONTROL_ENDPOINT) {
+    server.send(404, "text/plain", "disabled");
+    return;
+  }
+
+  String command = server.hasArg("command") ? server.arg("command") : "";
+  if (command.isEmpty()) {
+    command = extractCommand(server.arg("plain"));
+  }
+
+  command.toLowerCase();
+  String response;
+  if (!processRemoteControlCommand(command, response)) {
+    server.send(400, "application/json", response);
+    return;
+  }
+
+  server.send(200, "application/json", response);
+}
+
+void handleWebRemoteControl() {
+  if (!ENABLE_REMOTE_CONTROL_ENDPOINT) {
+    server.send(404, "text/plain", "disabled");
+    return;
+  }
+
+  String command;
+  if (server.hasArg("command")) {
+    command = server.arg("command");
+  } else {
+    command = extractCommand(server.arg("plain"));
+  }
+
+  if (command.isEmpty()) {
+    server.send(400, "application/json", "{\"status\":\"error\",\"message\":\"Missing command\"}");
+    return;
+  }
+
+  String response;
+  if (!processRemoteControlCommand(command, response)) {
+    server.send(400, "application/json", response);
+    return;
+  }
+
+  server.send(200, "application/json", response);
+}
+
 void handleDataEndpoint() {
   if (!ENABLE_HTTP_DATA_ENDPOINT) {
     server.send(404, "text/plain", "disabled");
@@ -370,6 +462,9 @@ void setup() {
   pinMode(HYSRF_TRIG_PIN, OUTPUT);
   pinMode(HYSRF_ECHO_PIN, INPUT);
   pinMode(MQ135_PIN, INPUT);
+  ledcSetup(LED_PWM_CHANNEL, LED_PWM_FREQUENCY, LED_PWM_RESOLUTION);
+  ledcAttachPin(LED_OUTPUT_PIN, LED_PWM_CHANNEL);
+  applyLedOutput();
 
   if (ensureWifi() == true) {
     Serial.println("wifi connected");
@@ -380,6 +475,12 @@ void setup() {
 
   if (ENABLE_HTTP_DATA_ENDPOINT) {
     server.on("/data", handleDataEndpoint);
+  }
+  if (ENABLE_REMOTE_CONTROL_ENDPOINT) {
+    server.on("/remote-control", HTTP_POST, handleRemoteControl);
+    server.on("/remote-control/web", HTTP_POST, handleWebRemoteControl);
+  }
+  if (ENABLE_HTTP_DATA_ENDPOINT || ENABLE_REMOTE_CONTROL_ENDPOINT) {
     server.begin();
   }
 }

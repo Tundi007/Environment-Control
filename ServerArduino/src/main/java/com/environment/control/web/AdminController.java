@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 @Controller
 public class AdminController {
@@ -97,20 +98,9 @@ public class AdminController {
     public String register(@RequestParam String deviceId,
                            @RequestParam String secret,
                            @RequestParam String name,
-                           @RequestParam(required = false, defaultValue = "") String endpointUrl) {
-        deviceService.register(deviceId, secret, name, endpointUrl);
-        return "redirect:/?selected=" + deviceId;
-    }
-
-    @PostMapping("/admin/devices/{deviceId}/request-upload")
-    public String requestUpload(@PathVariable String deviceId) {
-        deviceService.findByDeviceId(deviceId).ifPresent(deviceService::requestUpload);
-        return "redirect:/?selected=" + deviceId;
-    }
-
-    @PostMapping("/admin/devices/{deviceId}/clear-upload")
-    public String clearUpload(@PathVariable String deviceId) {
-        deviceService.findByDeviceId(deviceId).ifPresent(deviceService::clearRequest);
+                           @RequestParam(required = false, defaultValue = "") String endpointUrl,
+                           @RequestParam(required = false, defaultValue = "") String remoteControlEndpoint) {
+        deviceService.register(deviceId, secret, name, endpointUrl, remoteControlEndpoint);
         return "redirect:/?selected=" + deviceId;
     }
 
@@ -118,6 +108,48 @@ public class AdminController {
     public String refresh(@PathVariable String deviceId) {
         deviceService.findByDeviceId(deviceId).ifPresent(deviceCommunicationService::pullFromDevice);
         return "redirect:/?selected=" + deviceId;
+    }
+
+    @GetMapping("/admin/devices/{deviceId}/remote-control")
+    public String remoteControl(@PathVariable String deviceId, Model model) {
+        Device device = deviceService.findByDeviceId(deviceId).orElse(null);
+        if (device == null) {
+            return "redirect:/";
+        }
+        model.addAttribute("device", device);
+        return "remote-control";
+    }
+
+    @PostMapping("/admin/devices/{deviceId}/remote-control")
+    public String sendRemoteControlCommand(@PathVariable String deviceId,
+                                           @RequestParam String command,
+                                           RedirectAttributes redirectAttributes) {
+        Device device = deviceService.findByDeviceId(deviceId).orElse(null);
+        if (device == null) {
+            return "redirect:/";
+        }
+
+        if (!"increase".equalsIgnoreCase(command) && !"decrease".equalsIgnoreCase(command)) {
+            redirectAttributes.addFlashAttribute("status", "error");
+            redirectAttributes.addFlashAttribute("message", "Unknown remote control command.");
+            return "redirect:/admin/devices/" + deviceId + "/remote-control";
+        }
+
+        if (device.getRemoteControlEndpoint() == null || device.getRemoteControlEndpoint().isBlank()) {
+            redirectAttributes.addFlashAttribute("status", "error");
+            redirectAttributes.addFlashAttribute("message", "No remote control endpoint configured for this device.");
+            return "redirect:/admin/devices/" + deviceId + "/remote-control";
+        }
+
+        String normalizedCommand = command.toLowerCase();
+        boolean sent = deviceCommunicationService.sendRemoteControlCommand(device, normalizedCommand);
+        redirectAttributes.addFlashAttribute("status", sent ? "success" : "error");
+        redirectAttributes.addFlashAttribute(
+                "message",
+                sent
+                        ? "Sent '" + normalizedCommand + "' command to the device."
+                        : "Failed to reach the device for the requested command.");
+        return "redirect:/admin/devices/" + deviceId + "/remote-control";
     }
 
     @PostMapping("/admin/devices/{deviceId}/delete")

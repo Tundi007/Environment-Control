@@ -6,6 +6,7 @@ import com.environment.control.data.DeviceData;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.stereotype.Service;
@@ -56,5 +57,17 @@ public class DeviceCommunicationService {
         data.setSequenceNumber(record.getSequenceNumber());
         data.setPayload(record.getPayload());
         return data;
+    }
+
+    public boolean sendRemoteControlCommand(Device device, String command) {
+        if (device.getRemoteControlEndpoint() == null || device.getRemoteControlEndpoint().isBlank()) {
+            return false;
+        }
+        try {
+            restTemplate.postForEntity(device.getRemoteControlEndpoint(), Map.of("command", command), Void.class);
+            return true;
+        } catch (RestClientException ex) {
+            return false;
+        }
     }
 }
