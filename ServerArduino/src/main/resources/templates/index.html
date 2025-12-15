@@ -206,12 +206,12 @@
         </div>
         <div class="panel" style="background: rgba(255,255,255,0.02);">
             <table class="table" aria-label="Device data table">
-                <thead><tr><th>Sequence</th><th>Payload</th><th>Timestamp</th></tr></thead>
+                <thead><tr><th>Sequence</th><th>Payload</th><th>Sampled at</th></tr></thead>
                 <tbody>
                 <tr th:each="row : ${data}">
                     <td th:text="${row.sequenceNumber}"></td>
                     <td th:text="${row.payload}"></td>
-                    <td th:text="${row.createdAt}"></td>
+                    <td th:text="${row.sampledAt != null ? row.sampledAt : row.createdAt}"></td>
                 </tr>
                 </tbody>
             </table>

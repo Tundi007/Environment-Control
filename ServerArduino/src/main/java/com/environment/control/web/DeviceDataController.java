@@ -9,6 +9,7 @@ import com.environment.control.data.DeviceData;
 import com.environment.control.device.Device;
 import com.environment.control.device.DeviceRepository;
 import com.environment.control.device.DeviceService;
+import java.time.Instant;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.springframework.http.ResponseEntity;
@@ -86,6 +87,8 @@ public class DeviceDataController {
         DeviceData entity = new DeviceData();
         entity.setSequenceNumber(record.getSequenceNumber());
         entity.setPayload(record.getPayload());
+        Instant sampledAt = record.getSampledAt();
+        entity.setSampledAt(sampledAt != null ? sampledAt : Instant.now());
         return entity;
     }
 }

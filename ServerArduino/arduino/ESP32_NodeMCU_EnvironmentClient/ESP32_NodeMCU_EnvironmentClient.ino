@@ -20,6 +20,7 @@
 #include <WebServer.h>
 #include <NewPing.h>
 #include <MQUnifiedsensor.h>
+#include <time.h>
 
 // ---- Hardware configuration ----
 const uint8_t MQ135_PIN = 34;           // ADC pin for MQ135 sensor
@@ -74,6 +75,7 @@ const bool ENABLE_REMOTE_CONTROL_ENDPOINT = true; // expose POST /remote-control
 // ---- Internal state ----
 struct Reading {
   uint32_t sequence;
+  uint32_t sampledAtEpoch;
   float mq135;
   float temperatureC;
   float humidity;
@@ -113,6 +115,37 @@ size_t recordAddress(uint32_t index) {
 String valueOrNan(float value, uint8_t decimals) {
   if (isnan(value)) return String("nan");
   return String(value, static_cast<unsigned int>(decimals));
+}
+
+void configureTime() {
+  configTime(0, 0, "pool.ntp.org", "time.nist.gov");
+  time_t now = time(nullptr);
+  uint8_t retries = 0;
+  while (now < 1700000000 && retries < 20) { // ~2023-11-14
+    delay(500);
+    now = time(nullptr);
+    retries++;
+  }
+  if (now < 1700000000) {
+    Serial.println("Warning: NTP time not available, using millis() fallback for timestamps.");
+  }
+}
+
+uint32_t currentEpochSeconds() {
+  time_t now = time(nullptr);
+  if (now < 100000) { // fallback if NTP not synced
+    return millis() / 1000;
+  }
+  return static_cast<uint32_t>(now);
+}
+
+String formatTimestamp(uint32_t epochSeconds) {
+  time_t t = static_cast<time_t>(epochSeconds);
+  struct tm timeinfo;
+  gmtime_r(&t, &timeinfo);
+  char buffer[25];
+  strftime(buffer, sizeof(buffer), "%Y-%m-%dT%H:%M:%SZ", &timeinfo);
+  return String(buffer);
 }
 
 void persistIndexes() {
@@ -285,6 +318,13 @@ String makePayload(const Reading& r) {
   return payload;
 }
 
+String readingAsJson(const Reading& r) {
+  String json = "{\"sequenceNumber\":" + String(r.sequence);
+  json += ",\"sampledAt\":\"" + formatTimestamp(r.sampledAtEpoch) + "\"";
+  json += ",\"payload\":\"" + makePayload(r) + "\"}";
+  return json;
+}
+
 bool sendBatch() {
   if (sendIndex >= writeIndex) {
     Serial.println("No Data");
@@ -305,7 +345,7 @@ bool sendBatch() {
     Reading r;
     EEPROM.get(recordAddress(cursor), r);
     if (added > 0) body += ",";
-    body += "{\"sequenceNumber\":" + String(r.sequence) + ",\"payload\":\"" + makePayload(r) + "\"}";
+    body += readingAsJson(r);
     added++;
   }
   body += "]}";
@@ -399,7 +439,7 @@ void handleDataEndpoint() {
     Reading r;
     EEPROM.get(recordAddress(i), r);
     if (emitted++ > 0) body += ",";
-    body += "{\"sequenceNumber\":" + String(r.sequence) + ",\"payload\":\"" + makePayload(r) + "\"}";
+    body += readingAsJson(r);
   }
   body += "]";
   server.send(200, "application/json", body);
@@ -419,7 +459,7 @@ void saveReading(float mq135, float tempC, float humidity, float distanceCm) {
     // Prevent overwriting unsent data by advancing the send cursor.
     sendIndex = writeIndex - MAX_RECORDS + 1;
   }
-  Reading r{writeIndex, mq135, tempC, humidity, distanceCm};
+  Reading r{writeIndex, currentEpochSeconds(), mq135, tempC, humidity, distanceCm};
   EEPROM.put(recordAddress(writeIndex), r);
   writeIndex++;
   persistIndexes();
@@ -462,6 +502,7 @@ void setup() {
   } else {
     Serial.println("wifi didn't connect");
   }
+  configureTime();
   ensureAuthenticated();
 
   if (ENABLE_HTTP_DATA_ENDPOINT) {

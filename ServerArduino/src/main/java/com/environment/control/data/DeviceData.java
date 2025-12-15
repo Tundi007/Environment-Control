@@ -34,6 +34,9 @@ public class DeviceData {
     @Column(nullable = false)
     private Instant createdAt = Instant.now();
 
+    @Column(nullable = false)
+    private Instant sampledAt = Instant.now();
+
     public Long getId() {
         return id;
     }
@@ -64,5 +67,13 @@ public class DeviceData {
 
     public Instant getCreatedAt() {
         return createdAt;
+    }
+
+    public Instant getSampledAt() {
+        return sampledAt;
+    }
+
+    public void setSampledAt(Instant sampledAt) {
+        this.sampledAt = sampledAt;
     }
 }
