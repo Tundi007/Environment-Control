@@ -142,6 +142,9 @@
                     <input name="name" placeholder="Friendly name" required>
                     <input name="endpointUrl" placeholder="Device endpoint (optional)" title="Endpoint to poll data directly from the device">
                 </div>
+                <div class="form-row">
+                    <input name="ledControlEndpoint" placeholder="LED control endpoint (optional)" title="Endpoint that accepts increase/decrease commands for the LED">
+                </div>
                 <div>
                     <button class="btn-primary" type="submit">Save device</button>
                 </div>
@@ -168,8 +171,8 @@
                               th:text="${device.lastSeen != null && device.lastSeen.isAfter(T(java.time.Instant).now().minusSeconds(120))} ? 'Online' : 'Offline'"></span>
                     </div>
                     <div class="muted" th:if="${device.lastSeen != null}" th:text="${'Seen ' + device.lastSeen}"></div>
-                    <div class="muted">Upload status: <span th:text="${device.uploadRequested} ? 'Requested' : 'Idle'"></span></div>
                     <div class="actions">
+                        <a class="pill" th:href="@{'/admin/devices/' + ${device.deviceId} + '/led-control'}" target="_blank" rel="noopener">LED control</a>
                         <a class="pill" th:href="@{'/?selected=' + ${device.deviceId}}">View data</a>
                         <a class="pill" th:href="@{'/admin/devices/' + ${device.deviceId} + '/charts'}" target="_blank" rel="noopener">Open charts</a>
                         <form th:action="@{'/admin/devices/' + ${device.deviceId} + '/analysis'}" method="get" target="_blank">
@@ -177,12 +180,6 @@
                         </form>
                         <form th:action="@{'/admin/devices/' + ${device.deviceId} + '/refresh'}" method="post">
                             <button class="btn-secondary" type="submit">Sync now</button>
-                        </form>
-                        <form th:action="@{'/admin/devices/' + ${device.deviceId} + '/request-upload'}" method="post">
-                            <button class="btn-secondary" type="submit">Trigger upload</button>
-                        </form>
-                        <form th:action="@{'/admin/devices/' + ${device.deviceId} + '/clear-upload'}" method="post">
-                            <button class="btn-ghost" type="submit">Clear flag</button>
                         </form>
                         <form th:action="@{'/admin/devices/' + ${device.deviceId} + '/delete'}" method="post" onsubmit="return confirm('Delete device?');">
                             <button class="btn-danger" type="submit">Delete</button>
