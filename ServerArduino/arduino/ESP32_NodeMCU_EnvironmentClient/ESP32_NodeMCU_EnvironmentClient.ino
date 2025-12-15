@@ -437,8 +437,9 @@ void setup() {
 void loop() {
   const unsigned long now = millis();
 
+  pollForUpload();
+
   if (sendIndex < writeIndex && (now - lastSampleMs >= SAMPLE_INTERVAL_MS)) {
-    pollForUpload();
     sampleAndStore();
     lastSampleMs = now;
     sendBatch();
