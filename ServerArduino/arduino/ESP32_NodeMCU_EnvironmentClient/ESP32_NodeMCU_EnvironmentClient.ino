@@ -57,7 +57,7 @@ const char* ROOT_CA =
 
 // configuration.
 const uint32_t SAMPLE_INTERVAL_MS_DEMO = 3000;  // Add a reading every 1s
-const uint32_t UPLOAD_INTERVAL_MS_DEMO = 10000; 
+const uint32_t UPLOAD_INTERVAL_MS_DEMO = 30000; 
 const uint32_t SAMPLE_INTERVAL_MS = 600000;  // Add a reading every 10m
 const uint32_t UPLOAD_INTERVAL_MS = 3600000; 
 const bool ONLY_UPLOAD_WHEN_REQUESTED = true; // true = honor /pending-requests flag
@@ -221,7 +221,6 @@ bool pollForUpload() {
   int code = http.GET();
   if (code != HTTP_CODE_OK) {
     http.end();
-    Serial.println("Not Requested");
     return false;
   }
   String body = http.getString();
@@ -338,9 +337,6 @@ void saveReading(float mq135, float tempC, float humidity, float distanceCm) {
 void sampleAndStore() {
   mq135.update();
   float mqPpm = mq135.readSensor();
-  if (isnan(mqPpm)) {
-    Serial.println("MQ135 read failed");
-  }
 
   float temperatureC = dht.readTemperature();
   float humidity = dht.readHumidity();
