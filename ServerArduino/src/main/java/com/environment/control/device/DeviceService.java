@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import com.environment.control.data.DeviceDataRepository;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,12 +28,19 @@ public class DeviceService {
     }
 
     public Device register(String deviceId, String secret, String name, String endpointUrl) {
+        deviceRepository.findByDeviceId(deviceId).ifPresent(existing -> {
+            throw new DuplicateDeviceException(deviceId);
+        });
         Device device = new Device();
         device.setDeviceId(deviceId);
         device.setSecret(secret);
         device.setName(name);
         device.setEndpointUrl(endpointUrl);
-        return deviceRepository.save(device);
+        try {
+            return deviceRepository.save(device);
+        } catch (DataIntegrityViolationException ex) {
+            throw new DuplicateDeviceException(deviceId, ex);
+        }
     }
 
     @Transactional

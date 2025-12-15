@@ -24,6 +24,9 @@ public class DataIngestionService {
         long maxSequence = device.getLastSequenceAcknowledged() != null ? device.getLastSequenceAcknowledged() : -1;
         for (DeviceData data : records) {
             if (data.getSequenceNumber() != null) {
+                if (deviceDataRepository.existsByDeviceAndSequenceNumber(device, data.getSequenceNumber())) {
+                    continue;
+                }
                 maxSequence = Math.max(maxSequence, data.getSequenceNumber());
             }
             data.setDevice(device);

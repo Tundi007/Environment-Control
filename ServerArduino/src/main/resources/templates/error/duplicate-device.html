@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Duplicate device</title>
+    <style>
+        body { font-family: 'Inter', system-ui, -apple-system, sans-serif; background: #0f172a; color: #e2e8f0; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+        .card { background: #111827; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 24px; width: 420px; box-shadow: 0 20px 60px rgba(0,0,0,0.35); text-align: center; }
+        h1 { margin: 0 0 12px 0; font-size: 22px; letter-spacing: -0.01em; }
+        p { margin: 6px 0 18px 0; color: #cbd5e1; }
+        a { display: inline-block; margin-top: 4px; padding: 10px 14px; border-radius: 10px; text-decoration: none; font-weight: 600; }
+        .btn-primary { background: linear-gradient(120deg, #22d3ee, #a855f7); color: #0b1224; }
+        .btn-secondary { background: rgba(255,255,255,0.06); color: #e2e8f0; border: 1px solid rgba(255,255,255,0.08); }
+    </style>
+</head>
+<body>
+<div class="card">
+    <h1>Device already exists</h1>
+    <p th:text="${message}">A device with the same ID has already been registered.</p>
+    <a class="btn-primary" href="/">Back to dashboard</a>
+    <br>
+    <a class="btn-secondary" href="javascript:history.back()">Go back</a>
+</div>
+</body>
+</html>
