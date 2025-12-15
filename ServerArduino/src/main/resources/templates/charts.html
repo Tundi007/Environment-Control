@@ -3,51 +3,72 @@
 <head>
     <meta charset="UTF-8">
     <title th:text="${'Device Charts - ' + device.name}">Device Charts</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --panel: #0b1224;
+            --muted: #cbd5e1;
+            --border: rgba(255,255,255,0.08);
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background: radial-gradient(circle at 20% 20%, rgba(34,211,238,0.07), transparent 25%),
+                        radial-gradient(circle at 80% 0%, rgba(168,85,247,0.06), transparent 25%),
+                        var(--bg);
+            color: #e2e8f0;
+            min-height: 100vh;
+        }
+        .shell { max-width: 1100px; margin: 0 auto; padding: 32px 18px 50px; }
+        header { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 18px; }
+        h1 { margin: 0; font-size: 26px; letter-spacing: -0.02em; }
+        .muted { color: var(--muted); font-size: 14px; margin: 2px 0 0 0; }
+        .pill { display: inline-flex; align-items: center; padding: 6px 10px; border: 1px solid var(--border); border-radius: 999px; color: #cbd5e1; text-decoration: none; gap: 6px; }
+        .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 18px; box-shadow: 0 16px 50px rgba(0,0,0,0.35); }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px; }
+        canvas { width: 100%; height: 280px; }
+        .empty { text-align: center; color: var(--muted); padding: 18px; }
+    </style>
 </head>
-<body class="section">
-<div class="container">
-    <div class="level">
-        <div class="level-left">
-            <div>
-                <p class="heading">Device</p>
-                <p class="title is-4" th:text="${device.name}"></p>
-                <p class="subtitle is-6" th:text="${device.deviceId}"></p>
-            </div>
+<body>
+<div class="shell">
+    <header>
+        <div>
+            <h1 th:text="${device.name}">Device</h1>
+            <p class="muted" th:text="${device.deviceId}"></p>
         </div>
-        <div class="level-right">
-            <a class="button is-light" href="/">Back to dashboard</a>
+        <div style="display:flex; gap:8px; align-items:center;">
+            <a class="pill" href="/" target="_blank" rel="noopener">Dashboard</a>
+            <a class="pill" href="#" onclick="window.close(); return false;">Close</a>
         </div>
+    </header>
+
+    <div class="panel" th:if="${#strings.isEmpty(chartDataJson)}">
+        <p class="empty">No chart data available for this device yet.</p>
     </div>
 
-    <div class="notification is-info is-light" th:if="${#strings.isEmpty(chartDataJson)}">No chart data available.</div>
-
-    <div th:if="${!#strings.isEmpty(chartDataJson)}" class="columns is-multiline">
-        <div class="column is-12">
-            <div class="box">
-                <h2 class="subtitle">MQ135</h2>
-                <canvas id="mq135Chart" aria-label="MQ135 readings over time"></canvas>
-            </div>
+    <div th:if="${!#strings.isEmpty(chartDataJson)}" class="grid">
+        <div class="panel">
+            <h3 style="margin-top:0;">Air Quality (MQ135)</h3>
+            <canvas id="mq135Chart" aria-label="MQ135 readings over time"></canvas>
         </div>
-        <div class="column is-12">
-            <div class="box">
-                <h2 class="subtitle">Humidity</h2>
-                <canvas id="humidityChart" aria-label="Humidity readings over time"></canvas>
-            </div>
+        <div class="panel">
+            <h3 style="margin-top:0;">Humidity</h3>
+            <canvas id="humidityChart" aria-label="Humidity readings over time"></canvas>
         </div>
-        <div class="column is-12">
-            <div class="box">
-                <h2 class="subtitle">Temperature</h2>
-                <canvas id="temperatureChart" aria-label="Temperature readings over time"></canvas>
-            </div>
+        <div class="panel">
+            <h3 style="margin-top:0;">Temperature</h3>
+            <canvas id="temperatureChart" aria-label="Temperature readings over time"></canvas>
         </div>
-        <div class="column is-12">
-            <div class="box">
-                <h2 class="subtitle">Distance</h2>
-                <canvas id="distanceChart" aria-label="Distance readings over time"></canvas>
-            </div>
+        <div class="panel">
+            <h3 style="margin-top:0;">Distance</h3>
+            <canvas id="distanceChart" aria-label="Distance readings over time"></canvas>
         </div>
     </div>
 </div>
@@ -60,52 +81,63 @@
             .filter(point => point[key] !== null)
             .map(point => ({x: new Date(point.timestamp), y: point[key]}));
         return {
-            label: label,
+            label,
             data: filtered,
             borderColor: color,
             backgroundColor: color,
-            tension: 0.2,
-            fill: false
+            tension: 0.25,
+            fill: false,
+            pointRadius: 2
         };
     }
 
     function renderChart(canvasId, dataset, yLabel) {
+        const canvas = document.getElementById(canvasId);
         if (!dataset.data.length) {
-            document.getElementById(canvasId).parentElement.insertAdjacentHTML('beforeend', '<p class="has-text-grey">No data available.</p>');
+            canvas.insertAdjacentHTML('afterend', '<p class="empty">No data available.</p>');
+            canvas.remove();
             return;
         }
-        new Chart(document.getElementById(canvasId), {
+        new Chart(canvas, {
             type: 'line',
             data: { datasets: [dataset] },
             options: {
                 responsive: true,
                 parsing: false,
+                maintainAspectRatio: false,
                 scales: {
                     x: {
                         type: 'time',
                         time: {
                             tooltipFormat: 'yyyy-MM-dd HH:mm',
                             displayFormats: {
-                                minute: 'yyyy-MM-dd HH:mm',
-                                hour: 'yyyy-MM-dd HH:mm',
-                                day: 'yyyy-MM-dd'
+                                minute: 'HH:mm',
+                                hour: 'MMM d HH:mm',
+                                day: 'MMM d'
                             }
                         },
-                        title: { display: true, text: 'Timestamp' }
+                        ticks: { color: '#cbd5e1' },
+                        grid: { color: 'rgba(255,255,255,0.05)' },
+                        title: { display: true, text: 'Timestamp', color: '#e2e8f0' }
                     },
                     y: {
-                        title: { display: true, text: yLabel },
-                        beginAtZero: false
+                        title: { display: true, text: yLabel, color: '#e2e8f0' },
+                        ticks: { color: '#cbd5e1' },
+                        grid: { color: 'rgba(255,255,255,0.05)' }
                     }
+                },
+                plugins: {
+                    legend: { labels: { color: '#e2e8f0' } },
+                    tooltip: { mode: 'nearest', intersect: false }
                 }
             }
         });
     }
 
-    renderChart('mq135Chart', buildDataset(chartData, 'mq135', 'MQ135', '#209cee'), 'MQ135');
-    renderChart('humidityChart', buildDataset(chartData, 'humidity', 'Humidity (%)', '#23d160'), 'Humidity (%)');
-    renderChart('temperatureChart', buildDataset(chartData, 'temperature', 'Temperature (°C)', '#ff3860'), 'Temperature (°C)');
-    renderChart('distanceChart', buildDataset(chartData, 'distance', 'Distance', '#ffdd57'), 'Distance');
+    renderChart('mq135Chart', buildDataset(chartData, 'mq135', 'MQ135', '#22d3ee'), 'MQ135');
+    renderChart('humidityChart', buildDataset(chartData, 'humidity', 'Humidity (%)', '#34d399'), 'Humidity (%)');
+    renderChart('temperatureChart', buildDataset(chartData, 'temperature', 'Temperature (°C)', '#f87171'), 'Temperature (°C)');
+    renderChart('distanceChart', buildDataset(chartData, 'distance', 'Distance', '#eab308'), 'Distance');
 </script>
 </body>
 </html>
