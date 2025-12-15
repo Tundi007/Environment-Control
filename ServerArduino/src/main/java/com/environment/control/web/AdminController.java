@@ -10,6 +10,7 @@ import com.environment.control.web.view.ChartDataPoint;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -159,6 +160,7 @@ public class AdminController {
     }
 
     private ChartDataPoint toChartPoint(DeviceData data) {
+        Instant timestamp = data.getSampledAt() != null ? data.getSampledAt() : data.getCreatedAt();
         Map<String, Object> payload = parsePayload(data.getPayload());
         Double mq135 = toDouble(payload.get("mq135"));
         Double humidity = toDouble(payload.get("humidity"));
@@ -167,7 +169,7 @@ public class AdminController {
         if (mq135 == null && humidity == null && temperature == null && distance == null) {
             return null;
         }
-        return new ChartDataPoint(data.getCreatedAt(), mq135, humidity, temperature, distance);
+        return new ChartDataPoint(timestamp, mq135, humidity, temperature, distance);
     }
 
     private Map<String, Object> parsePayload(String payloadString) {

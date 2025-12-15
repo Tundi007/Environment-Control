@@ -5,6 +5,7 @@ import com.environment.control.device.Device;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
 import java.util.List;
@@ -43,9 +44,9 @@ public class ChatGptService {
         }
 
         List<DeviceData> latest = records.stream()
-                .sorted(Comparator.comparing(DeviceData::getCreatedAt).reversed())
+                .sorted(Comparator.comparing(this::timelineInstant).reversed())
                 .limit(MAX_RECORDS)
-                .sorted(Comparator.comparing(DeviceData::getCreatedAt))
+                .sorted(Comparator.comparing(this::timelineInstant))
                 .toList();
 
         String deviceSummary = buildDeviceSummary(device, latest);
@@ -78,7 +79,7 @@ public class ChatGptService {
                 ? "(No stored records)"
                 : latest.stream()
                 .map(data -> "#" + data.getSequenceNumber() + " @ "
-                        + DateTimeFormatter.ISO_INSTANT.format(data.getCreatedAt()) + " => "
+                        + DateTimeFormatter.ISO_INSTANT.format(timelineInstant(data)) + " => "
                         + normalizePayload(data.getPayload()))
                 .collect(Collectors.joining("\n"));
 
@@ -98,6 +99,10 @@ public class ChatGptService {
         } catch (Exception ignored) {
             return payload;
         }
+    }
+
+    private Instant timelineInstant(DeviceData data) {
+        return data.getSampledAt() != null ? data.getSampledAt() : data.getCreatedAt();
     }
 
     private record ChatCompletionRequest(String model, List<ChatMessage> messages) {
