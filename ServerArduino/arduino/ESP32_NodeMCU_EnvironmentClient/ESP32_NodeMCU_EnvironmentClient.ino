@@ -268,7 +268,6 @@ String makePayload(const Reading& r) {
 }
 
 bool sendBatch() {
-  Serial.println("Transmition Attempt");
   if (sendIndex >= writeIndex) {
     Serial.println("No Data");
     return true;
