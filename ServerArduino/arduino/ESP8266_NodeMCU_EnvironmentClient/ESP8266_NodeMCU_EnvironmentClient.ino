@@ -1,5 +1,5 @@
 /**
- * ESP8266 NodeMCU client for the Environment Control backend.
+ * ESP32 NodeMCU client for the Environment Control backend.
  *
  * - Samples MQ135 (gas), DHT11 (temp/humidity), and HY-SRF05 (ultrasonic).
  * - Packages readings with ISO-8601 timestamps into DeviceDataRecord payload strings.
@@ -13,32 +13,32 @@
  *   - NewPing
  */
 #include <Arduino.h>
-#include <ESP8266WiFi.h>
-#include <ESP8266HTTPClient.h>
-#include <WiFiClientSecureBearSSL.h>
+#include <WiFi.h>
+#include <HTTPClient.h>
+#include <WiFiClientSecure.h>
 #include <DHT.h>
 #include <NewPing.h>
 #include <MQUnifiedsensor.h>
 #include <time.h>
 
 // ---- Hardware configuration ----
-const uint8_t MQ135_PIN = A0;           // ADC pin for MQ135 sensor
-const char* MQ135_BOARD = "ESP8266";    // Board identifier for MQUnifiedsensor
-const float MQ135_VOLTAGE = 3.3;        // ESP8266 ADC reference voltage
-const uint16_t MQ135_ADC_RESOLUTION = 10;
+const uint8_t MQ135_PIN = 34;           // ADC pin for MQ135 sensor
+const char* MQ135_BOARD = "ESP-32";     // Board identifier for MQUnifiedsensor
+const float MQ135_VOLTAGE = 3.3;        // ESP32 ADC reference voltage
+const uint16_t MQ135_ADC_RESOLUTION = 12;
 const float MQ135_CLEAN_AIR_RATIO = 3.6; // Datasheet recommended clean-air ratio
 
-const uint8_t DHT_PIN = D2;    // GPIO connected to DHT11 data pin
+const uint8_t DHT_PIN = 4;    // GPIO connected to DHT11 data pin
 const uint8_t DHT_TYPE = DHT11;
 
-const uint8_t HYSRF_TRIG_PIN = D5;  // GPIO to drive HY-SRF05 trigger
-const uint8_t HYSRF_ECHO_PIN = D6;  // GPIO to read HY-SRF05 echo
+const uint8_t HYSRF_TRIG_PIN = 5;   // GPIO to drive HY-SRF05 trigger
+const uint8_t HYSRF_ECHO_PIN = 18;  // GPIO to read HY-SRF05 echo
 const uint16_t ULTRASONIC_MAX_DISTANCE_CM = 400; // Maximum distance to measure
 
 // ---- User configuration ----
 const char* WIFI_SSID = "your-ssid";
 const char* WIFI_PASSWORD = "your-password";
-const char* DEVICE_ID = "esp8266";
+const char* DEVICE_ID = "esp32";
 const char* DEVICE_SECRET = "changeme";
 const char* API_HOST = "192.168.1.2";
 const uint16_t API_PORT = 8080; // 8443 for HTTPS
@@ -70,7 +70,7 @@ DHT dht(DHT_PIN, DHT_TYPE);
 NewPing sonar(HYSRF_TRIG_PIN, HYSRF_ECHO_PIN, ULTRASONIC_MAX_DISTANCE_CM);
 
 #if USE_TLS
-BearSSL::WiFiClientSecure netClient;
+WiFiClientSecure netClient;
 #else
 WiFiClient netClient;
 #endif
@@ -127,7 +127,7 @@ bool login() {
   if (!ensureWifi()) return false;
 
 #if USE_TLS
-  netClient.setTrustAnchors(new BearSSL::X509List(ROOT_CA));
+  netClient.setCACert(ROOT_CA);
 #endif
 
   HTTPClient http;
@@ -236,7 +236,7 @@ void setup() {
   Serial.begin(115200);
   delay(500);
   Serial.println();
-  Serial.println("ESP8266 Environment Client starting...");
+  Serial.println("ESP32 Environment Client starting...");
 
   if (!ensureWifi()) {
     Serial.println("Wi-Fi connection failed");
