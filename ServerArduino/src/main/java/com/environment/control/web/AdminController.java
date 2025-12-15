@@ -28,16 +28,18 @@ public class AdminController {
     private final DataIngestionService dataIngestionService;
     private final DeviceCommunicationService deviceCommunicationService;
     private final ChatGptService chatGptService;
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper;
 
     public AdminController(DeviceService deviceService,
                            DataIngestionService dataIngestionService,
                            DeviceCommunicationService deviceCommunicationService,
-                           ChatGptService chatGptService) {
+                           ChatGptService chatGptService,
+                           ObjectMapper objectMapper) {
         this.deviceService = deviceService;
         this.dataIngestionService = dataIngestionService;
         this.deviceCommunicationService = deviceCommunicationService;
         this.chatGptService = chatGptService;
+        this.objectMapper = objectMapper;
     }
 
     @GetMapping({"/", "/admin"})
